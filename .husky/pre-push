@@ -4,4 +4,4 @@
 [ -n "$CI" ] && exit 0
 
 node node_modules/eslint/bin/eslint.js "src/**/*.ts" "src/**/*.html"
-npm test
+node node_modules/@angular/cli/bin/ng.js test --watch=false
