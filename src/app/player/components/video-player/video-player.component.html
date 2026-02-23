@@ -48,10 +48,12 @@
                     *ngIf="chosenPlayer === 'html5'"
                     [channel]="activeChannel"
                     [showCaptions]="playerSettings.showCaptions"
+                    (mediaInfo)="onMediaInfo($event)"
                 />
                 <app-mpegts-player
                     *ngIf="chosenPlayer === 'mpegts'"
                     [channel]="activeChannel"
+                    (mediaInfo)="onMediaInfo($event)"
                 />
                 <div
                     class="custom-player"
@@ -89,6 +91,7 @@
                     [channel]="activeChannel"
                     [epgProgram]="epgProgram$ | async"
                     [controlsActive]="uiActive"
+                    [runtimeMeta]="runtimeMeta"
                 ></app-info-overlay>
                 </div>
             </ng-template>

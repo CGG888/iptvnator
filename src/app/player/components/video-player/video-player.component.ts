@@ -36,6 +36,12 @@ import { getPlaybackUrl, isMpegtsLikeUrl, stripAfterDollar } from '../../../../.
 
 /** Possible sidebar view options */
 export type SidebarView = 'CHANNELS' | 'PLAYLISTS';
+type RuntimeMeta = {
+    width?: number;
+    height?: number;
+    fps?: number;
+    audioChannels?: number;
+};
 
 export const COMPONENT_OVERLAY_REF = new InjectionToken(
     'COMPONENT_OVERLAY_REF'
@@ -108,6 +114,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     uiActive = true;
     private uiTimer: any;
     private uiIdleMs = 2500;
+    runtimeMeta: RuntimeMeta = {};
 
     constructor(
         private activatedRoute: ActivatedRoute,
@@ -248,6 +255,10 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
 
     getActiveSrc(channel: Channel): string {
         return getPlaybackUrl(channel as any);
+    }
+
+    onMediaInfo(meta: RuntimeMeta) {
+        this.runtimeMeta = { ...this.runtimeMeta, ...meta };
     }
 
     ngOnDestroy() {

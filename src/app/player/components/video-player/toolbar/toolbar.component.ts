@@ -88,8 +88,23 @@ export class ToolbarComponent {
     getQualitySuffix(c: Channel): string {
         const sfx = getDollarSuffix(c.url);
         const combined = (c.name || '') + ' ' + sfx;
-        if (/\b(4k|uhd|超高清|2160|3840x2160)\b/i.test(combined)) return 'UHD';
-        if (/\b(hd|高清|1080|720)\b/i.test(combined)) return 'HD';
+        const lower = combined.toLowerCase();
+        // UHD: include Latin terms with word boundaries and CJK terms without
+        if (
+            /\b(8k|4320p|uhd|4k|2160p)\b/i.test(lower) ||
+            /(超高清|3840x2160|2160)/i.test(combined)
+        )
+            return 'UHD';
+        // HD/FHD: include common Chinese synonyms and Latin terms
+        if (
+            /\b(fhd|fullhd|full hd|1080p|1080|1440p|2k|720p|720|hd)\b/i.test(lower) ||
+            /(超清|蓝光|高清)/i.test(combined)
+        )
+            return 'HD';
+        // SD explicit hints
+        if (/\b(480p|576p|480|576|sd)\b/i.test(lower) || /(标清)/i.test(combined))
+            return 'SD';
+        // Default fallback
         return 'SD';
     }
 

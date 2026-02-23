@@ -7,7 +7,11 @@
             </div>
             <div class="channel-details">
                 <div class="channel-name">
-                    {{ channel?.name[0]?.value }}
+                    {{
+                        channel?.name?.length
+                            ? channel.name[0]?.value
+                            : (channel?.id || '')
+                    }}
                 </div>
                 <div class="program-name">
                     {{
@@ -74,13 +78,7 @@
                         [class.active]="
                             timeNow >= item.start && timeNow <= item.stop
                         "
-                        (click)="
-                            setEpgProgram(
-                                item,
-                                timeNow >= item.start && timeNow <= item.stop,
-                                item.start > timeshiftUntil
-                            )
-                        "
+                        (click)="setEpgProgram(item, false, true)"
                     >
                         <div matListItemTitle [innerHTML]="item?.title[0]?.value"></div>
                         <div matListItemLine>

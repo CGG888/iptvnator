@@ -18,7 +18,8 @@
         height: 32px !important;
         border-radius: 4px !important;
         object-fit: contain;
-        background: #fff;
+        background: transparent !important;
+        background-color: transparent !important;
     }
 
     .dark-theme {

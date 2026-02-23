@@ -1,6 +1,6 @@
 <div
     class="channel-overlay"
-    *ngIf="channel && epgProgram"
+    *ngIf="channel"
     [class.visible]="controlsActive"
     [class.hidden]="!controlsActive"
 >
@@ -14,22 +14,26 @@
     <div class="content">
         <div class="program-title-row">
             <div class="program-title">
-                {{ epgProgram?.title[0]?.value }} | {{ channel.name }}
+                {{ epgProgram?.title[0]?.value ? (epgProgram?.title[0]?.value + ' | ' + channel.name) : channel.name }}
             </div>
+            <span class="badge" [ngClass]="isLive ? 'live' : (isReplay ? 'rec' : '')">{{ netTypeLabel() }}</span>
+            <span class="badge" [ngClass]="isLive ? 'live' : (isReplay ? 'rec' : '')">{{ qualityLabel() }}</span>
+            <span *ngIf="fpsLabel()" class="badge" [ngClass]="isLive ? 'live' : (isReplay ? 'rec' : '')">{{ fpsLabel() }}</span>
+            <span *ngIf="audioLabel()" class="badge" [ngClass]="isLive ? 'live' : (isReplay ? 'rec' : '')">{{ audioLabel() }}</span>
             <span *ngIf="isLive" class="badge live">正在直播</span>
             <span *ngIf="!isLive && isReplay" class="badge rec">正在回放</span>
         </div>
-        <div class="program-description">
+        <div class="program-description" *ngIf="epgProgram">
             {{ epgProgram?.desc[0]?.value }}
         </div>
-        <div class="program-progress">
+        <div class="program-progress" *ngIf="epgProgram">
             <div
                 class="program-finished"
                 [ngStyle]="{
                     width: (finishedDuration * 100) / generalDuration + '%'
                 }"
             ></div>
-            <div class="duration">
+            <div class="duration" *ngIf="epgProgram">
                 {{ start | momentDate: 'YYYYMMDDHHmm ZZ':'HH:mm' }}
                 -
                 {{ stop | momentDate: 'YYYYMMDDHHmm ZZ':'HH:mm' }}

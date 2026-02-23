@@ -99,24 +99,21 @@ export class EpgListComponent {
         );
     }
 
+    
+
     /**
      * Handles incoming epg programs for the active channel from the main process
      * @param programs
      */
     handleEpgData(programs: { payload: EpgData }): void {
-        if (programs?.payload?.items?.length > 0) {
-            this.programs = programs;
-            this.timeNow = moment(Date.now()).format(DATE_TIME_FORMAT);
-            this.dateToday = moment(Date.now()).format(DATE_FORMAT);
-            this.channel = programs.payload?.channel;
-            this.items = this.selectPrograms(programs);
-
-            this.setPlayingNow();
-        } else {
-            this.items = [];
-            this.channel = null;
-            this.store.dispatch(setCurrentEpgProgram(undefined));
-        }
+        this.programs = programs;
+        this.timeNow = moment(Date.now()).format(DATE_TIME_FORMAT);
+        this.dateToday = moment(Date.now()).format(DATE_FORMAT);
+        this.channel = programs?.payload?.channel ?? this.channel;
+        const selected = this.selectPrograms(programs);
+        this.items = selected.length > 0 ? selected : this.generatePlaceholdersForDate(this.dateToday);
+        if (this.items.length > 0) this.setPlayingNow();
+        else this.store.dispatch(setCurrentEpgProgram(undefined));
     }
 
     /**
@@ -124,7 +121,7 @@ export class EpgListComponent {
      * @param programs object with all available epg programs for the active channel
      */
     selectPrograms(programs: { payload: EpgData }): EpgProgram[] {
-        return programs.payload?.items
+        const filtered = programs?.payload?.items
             .filter((item) => item.start.includes(this.dateToday.toString()))
             .map((program) => ({
                 ...program,
@@ -137,7 +134,11 @@ export class EpgListComponent {
             }))
             .sort((a, b) => {
                 return a.start.localeCompare(b.start);
-            });
+            }) || [];
+        if (filtered.length === 0) {
+            return this.generatePlaceholdersForDate(this.dateToday);
+        }
+        return filtered;
     }
 
     /**
@@ -190,6 +191,37 @@ export class EpgListComponent {
         this.store.dispatch(setCurrentEpgProgram({ program }));
     }
 
+    private generatePlaceholdersForDate(dateStr: string): EpgProgram[] {
+        const base = moment(dateStr, DATE_FORMAT);
+        const tz = moment().format('ZZ');
+        const channelId = this.channel?.id || '';
+        const result: EpgProgram[] = [];
+        for (let h = 0; h < 24; h++) {
+            const start = base.clone().hour(h).minute(0).second(0);
+            const stop = start.clone().add(1, 'hour');
+            result.push({
+                start: start.format(DATE_TIME_FORMAT),
+                stop: stop.format(DATE_TIME_FORMAT),
+                channel: channelId,
+                title: [{ lang: 'zh', value: '精彩节目' }],
+                desc: [],
+                category: [],
+                date: [],
+                episodeNum: [],
+                previouslyShown: [],
+                subtitles: [],
+                icon: [],
+                rating: [],
+                credits: [],
+                audio: [],
+                _attributes: {
+                    start: start.format(`YYYYMMDDHHmm ${tz}`),
+                    stop: stop.format(`YYYYMMDDHHmm ${tz}`),
+                },
+            });
+        }
+        return result;
+    }
     /**
      * Removes all ipc renderer listeners after destroy
      */
