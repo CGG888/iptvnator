@@ -38,7 +38,9 @@ jobs:
         id: tags
         shell: bash
         run: |
-          REPO="${{ github.repository_owner }}/iptvnator"
+          USERNAME="${{ secrets.DOCKERHUB_USERNAME }}"
+          # ensure lowercase for Docker Hub namespace
+          REPO="${USERNAME,,}/iptvnator"
           V="${{ inputs.version }}"
           {
             echo "tags<<EOF"
