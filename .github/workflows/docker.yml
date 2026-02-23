@@ -23,6 +23,10 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -30,7 +34,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Login to Docker Hub
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to Docker Hub (if credentials exist)
+        if: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -43,9 +55,20 @@ jobs:
         id: tags
         shell: bash
         run: |
-          USERNAME="${{ secrets.DOCKERHUB_USERNAME }}"
-          # ensure lowercase for Docker Hub namespace
-          REPO="${USERNAME,,}/iptvnator"
+          OWNER="${{ github.repository_owner }}"
+          OWNER_LC="${OWNER,,}"
+          # GHCR repository
+          GHCR_REPO="ghcr.io/${OWNER_LC}/iptvnator"
+
+          # Optional Docker Hub repository when credentials are present
+          DH_USER="${{ secrets.DOCKERHUB_USERNAME }}"
+          DH_TOKEN="${{ secrets.DOCKERHUB_TOKEN }}"
+          HAS_DH="false"
+          if [ -n "$DH_USER" ] && [ -n "$DH_TOKEN" ]; then
+            DH_REPO="${DH_USER,,}/iptvnator"
+            HAS_DH="true"
+          fi
+
           EVENT_NAME="${{ github.event_name }}"
           REF_TYPE="${{ github.ref_type }}"
           REF_NAME="${{ github.ref_name }}"
@@ -69,9 +92,17 @@ jobs:
           fi
           {
             echo "tags<<EOF"
-            echo "${REPO}:${V}"
+            # Always push to GHCR
+            echo "${GHCR_REPO}:${V}"
+            # Optionally add Docker Hub tags
+            if [ "$HAS_DH" = "true" ]; then
+              echo "${DH_REPO}:${V}"
+            fi
             if [ "$LATEST_INPUT" = "true" ]; then
-              echo "${REPO}:latest"
+              echo "${GHCR_REPO}:latest"
+              if [ "$HAS_DH" = "true" ]; then
+                echo "${DH_REPO}:latest"
+              fi
             fi
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
