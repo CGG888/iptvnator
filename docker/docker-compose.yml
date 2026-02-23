@@ -6,7 +6,7 @@ services:
     network_mode: host
     restart: unless-stopped
     environment:
-      - CLIENT_URL=http://127.0.0.1:${FRONTEND_PORT:-4333}
+      - CLIENT_URL=http://127.0.0.1:${FRONTEND_PORT:-8088}
       - PORT=${BACKEND_PORT:-7333}
 
   frontend:
@@ -15,4 +15,4 @@ services:
     restart: unless-stopped
     environment:
       - BACKEND_URL=http://127.0.0.1:${BACKEND_PORT:-7333}
-      - FRONTEND_PORT=${FRONTEND_PORT:-4333}
+      - FRONTEND_PORT=${FRONTEND_PORT:-8088}
