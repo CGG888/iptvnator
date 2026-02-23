@@ -17,6 +17,11 @@ on:
         required: false
         default: 'linux/amd64,linux/arm64'
         type: string
+  release:
+    types: [published]
+  push:
+    tags:
+      - 'v*'
 
 jobs:
   build:
@@ -41,11 +46,31 @@ jobs:
           USERNAME="${{ secrets.DOCKERHUB_USERNAME }}"
           # ensure lowercase for Docker Hub namespace
           REPO="${USERNAME,,}/iptvnator"
-          V="${{ inputs.version }}"
+          EVENT_NAME="${{ github.event_name }}"
+          REF_TYPE="${{ github.ref_type }}"
+          REF_NAME="${{ github.ref_name }}"
+          RAW_TAG=""
+
+          if [ "$EVENT_NAME" = "release" ] && [ -n "${{ github.event.release.tag_name }}" ]; then
+            RAW_TAG="${{ github.event.release.tag_name }}"
+            V="${RAW_TAG#v}"
+          elif [ "$REF_TYPE" = "tag" ] && [ -n "$REF_NAME" ]; then
+            RAW_TAG="$REF_NAME"
+            V="${RAW_TAG#v}"
+          elif [ -n "${{ inputs.version }}" ]; then
+            V="${{ inputs.version }}"
+          else
+            V="$(node -p "require('./package.json').version")"
+          fi
+
+          LATEST_INPUT="${{ inputs.latest }}"
+          if [ -z "$LATEST_INPUT" ]; then
+            LATEST_INPUT="true"
+          fi
           {
             echo "tags<<EOF"
             echo "${REPO}:${V}"
-            if [ "${{ inputs.latest }}" = "true" ]; then
+            if [ "$LATEST_INPUT" = "true" ]; then
               echo "${REPO}:latest"
             fi
             echo "EOF"
