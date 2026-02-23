@@ -3,5 +3,12 @@
 
 [ -n "$CI" ] && exit 0
 
-node node_modules/eslint/bin/eslint.js "src/**/*.ts" "src/**/*.html"
-node node_modules/@angular/cli/bin/ng.js test --watch=false
+# Toggle checks with: git config hooks.runChecks true|false (default: false)
+RUN_CHECKS="$(git config --bool hooks.runChecks || echo false)"
+if [ "$RUN_CHECKS" != "true" ]; then
+  echo "pre-push: skipping lint/tests (enable with: git config hooks.runChecks true)"
+  exit 0
+fi
+
+node node_modules/eslint/bin/eslint.js "src/**/*.ts" "src/**/*.html" || exit 1
+node node_modules/@angular/cli/bin/ng.js test --watch=false || exit 1
