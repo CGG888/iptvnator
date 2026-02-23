@@ -1,16 +1,18 @@
----
+version: "3.9"
+
 services:
   backend:
-    image: 4gray/iptvnator-backend:latest
-    ports:
-      - "7333:3000"
+    image: ${BACKEND_IMAGE:-4gray/iptvnator-backend:latest}
+    network_mode: host
+    restart: unless-stopped
     environment:
-      - CLIENT_URL=http://localhost:4333 #this one should match with the address and port in frontend CLIENT_URL env
-      
-  frontend: 
-    image: 4gray/iptvnator:latest
-    ports:
-      - "4333:80"
+      - CLIENT_URL=http://127.0.0.1:${FRONTEND_PORT:-4333}
+      - PORT=${BACKEND_PORT:-7333}
+
+  frontend:
+    image: ${FRONTEND_IMAGE:-ghcr.io/cgg888/iptvnator:latest}
+    network_mode: host
+    restart: unless-stopped
     environment:
-      - BACKEND_URL=http://192.168.172.67:7333 # this one should match with the address of the backend service
-      
+      - BACKEND_URL=http://127.0.0.1:${BACKEND_PORT:-7333}
+      - FRONTEND_PORT=${FRONTEND_PORT:-4333}
