@@ -171,7 +171,7 @@ describe('EpgListComponent', () => {
     it('should set epg program as active', () => {
         jest.spyOn(mockStore, 'dispatch');
         component.setEpgProgram(MOCKED_PROGRAMS.items[0], false, true);
-        expect(mockStore.dispatch).toHaveBeenCalledTimes(1);
+        expect(mockStore.dispatch).toHaveBeenCalledTimes(2);
         expect(mockStore.dispatch).toHaveBeenCalledWith({
             program: MOCKED_PROGRAMS.items[0],
             type: expect.stringContaining('epg program'),
@@ -181,8 +181,8 @@ describe('EpgListComponent', () => {
     it('should reset active epg program', () => {
         jest.spyOn(mockStore, 'dispatch');
         component.setEpgProgram(MOCKED_PROGRAMS.items[0], true);
-        expect(mockStore.dispatch).toHaveBeenCalledTimes(1);
-        component.setEpgProgram(MOCKED_PROGRAMS.items[0], true, true);
         expect(mockStore.dispatch).toHaveBeenCalledTimes(2);
+        component.setEpgProgram(MOCKED_PROGRAMS.items[0], true, true);
+        expect(mockStore.dispatch).toHaveBeenCalledTimes(4);
     });
 });

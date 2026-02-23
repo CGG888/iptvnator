@@ -52,17 +52,9 @@
         "category": "Video",
         "target": [
             "AppImage",
-            "snap",
+            "Snap",
             "deb",
             "rpm"
         ]
-    },
-    "publish": [
-        {
-            "provider": "github",
-            "owner": "CGG888",
-            "repo": "iptvnator",
-            "releaseType": "draft"
-        }
-    ]
+    }
 }
