@@ -69,8 +69,20 @@ export class ChannelListContainerComponent {
 
     @Input('channelList')
     set channelList(value: Channel[]) {
-        this._channelList = value;
-        this.groupedChannels = _.default.groupBy(value, 'group.title');
+        const input = Array.isArray(value) ? value : [];
+        const unique: Record<string, Channel> = {};
+        input.forEach((ch) => {
+            const name = ch?.name?.trim()?.toLowerCase() || '';
+            const is4k =
+                /\b(4k|uhd)\b/i.test(ch?.name || '') ||
+                /\b(2160|3840x2160)\b/i.test(ch?.name || '');
+            const key = name + (is4k ? '__4k' : '__sd');
+            if (!unique[key]) {
+                unique[key] = ch;
+            }
+        });
+        this._channelList = Object.values(unique);
+        this.groupedChannels = _.default.groupBy(this._channelList, 'group.title');
     }
 
     /** Object with channels sorted by groups */

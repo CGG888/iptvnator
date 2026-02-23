@@ -21,6 +21,11 @@
     padding: 20px;
 }
 
+.player-surface {
+    position: relative;
+    height: 100%;
+}
+
 @media only screen and (max-width: 599px) {
     .main-container {
         display: flex;

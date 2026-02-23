@@ -26,6 +26,6 @@ jobs:
           file: ./docker/Dockerfile
           push: true
           tags: |
-              4gray/iptvnator:latest
-              4gray/iptvnator:${{ github.sha }}
+              ${{ github.repository_owner }}/iptvnator:latest
+              ${{ github.repository_owner }}/iptvnator:${{ github.sha }}
           platforms: linux/amd64,linux/arm64

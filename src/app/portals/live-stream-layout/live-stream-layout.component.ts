@@ -43,7 +43,7 @@ import { WebPlayerViewComponent } from '../web-player-view/web-player-view.compo
 })
 export class LiveStreamLayoutComponent {
     @Input({ required: true }) channels: XtreamItem[];
-    @Input({ required: true }) player: VideoPlayer = VideoPlayer.VideoJs;
+    @Input({ required: true }) player: VideoPlayer | 'mpegts' = VideoPlayer.VideoJs;
     @Input() epgItems: EpgItem[];
     @Input() streamUrl: string;
     @Input() activeLiveStream: XtreamItem;

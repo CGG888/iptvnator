@@ -103,7 +103,7 @@
     "IMPORT_ERROR": "导入错误，请尝试使用其他文件。",
     "EPG_URL_ERROR": "该值不是有效的 URL",
     "EXPORT_DATA": "出口",
-    "VIDEO_PLAYER_DESCRIPTION": "选择默认视频播放器",
+    "VIDEO_PLAYER_DESCRIPTION": "选择默认视频播放器。Auto：m3u8→Video.js；ts/flv/mpegts→mpegts.js；mp4→HTML5。",
     "IMPORT_EXPORT_DATA": "导入/导出播放列表",
     "VLC_PLAYER_PATH_LABEL": "VLC路径",
     "VLC_PLAYER_PATH_DESCRIPTION": "设置系统中 VLC 播放器的路径。\n它将使用提供的 VLC 二进制文件路径，而不是我们系统的默认路径。",
@@ -135,13 +135,16 @@
     "OPEN_CHANNELS_LIST": "打开频道列表",
     "TOGGLE_FAVORITE_FLAG": "切换收藏夹标志",
     "OPEN_EPG_LIST": "打开电子节目单EPG列表",
-    "OPEN_MULTI_EPG": "打开多EPG显示"
+    "OPEN_MULTI_EPG": "打开多EPG显示",
+    "SWITCH_SOURCE": "切换源"
   },
   "EPG": {
     "NEXT_DAY": "明天",
     "PREVIOUS_DAY": "昨天",
     "LIVE_NOW": "正在播放",
+    "UPCOMING": "待播",
     "LIVE_STREAM": "正在直播",
+    "REPLAYING": "正在回放",
     "TIMESHIFT_AVAILABLE": "时移功能可用，点击播放",
     "EPG_NOT_AVAILABLE_DATE": "错误：电子节目单EPG在所选日期不可用",
     "EPG_NOT_AVAILABLE_CHANNEL_TITLE": "错误：电子节目单EPG不适用于此频道",

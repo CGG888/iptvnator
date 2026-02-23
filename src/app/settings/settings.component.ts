@@ -81,12 +81,20 @@ export class SettingsComponent implements OnInit {
     /** Player options */
     players = [
         {
+            id: VideoPlayer.Auto,
+            label: 'Auto Player',
+        },
+        {
             id: VideoPlayer.Html5Player,
             label: 'HTML5 Video Player',
         },
         {
             id: VideoPlayer.VideoJs,
             label: 'VideoJs Player',
+        },
+        {
+            id: VideoPlayer.Mpegts,
+            label: 'MPEGTS (mpegts.js)',
         },
         ...(this.isElectron ? this.electronPlayers : []),
     ];

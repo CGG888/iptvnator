@@ -29,10 +29,8 @@ import { TranslateModule } from '@ngx-translate/core';
         <img
             matListItemAvatar
             class="channel-logo"
-            *ngIf="logo"
-            [src]="logo"
-            width="48"
-            onerror="this.style.display='none'"
+            [src]="logo || defaultLogo"
+            (error)="onImgError($event)"
         />
         <p matListItemTitle class="channel-name">
             {{ name }}
@@ -67,4 +65,13 @@ export class ChannelListItemComponent {
 
     @Output() clicked = new EventEmitter<void>();
     @Output() favoriteToggled = new EventEmitter();
+
+    defaultLogo = './assets/icons/icon-tv-256.png';
+
+    onImgError(ev: Event) {
+        const img = ev.target as HTMLImageElement;
+        if (img && img.src !== this.defaultLogo) {
+            img.src = this.defaultLogo;
+        }
+    }
 }

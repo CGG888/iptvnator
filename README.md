@@ -1,132 +1,166 @@
-# IPTVnator - IPTV Player Application
+# IPTVnator - IPTV 播放器应用
 
-Translations: [简体中文](./README.zh-CN.md)
+Translations: [English](./README.en.md)
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/4gray/iptvnator/electron/src/assets/icons/favicon.256x256.png" alt="IPTVnator icon" title="Free IPTV player application" />
-</p>
-<p align="center">
-  <a href="https://github.com/4gray/iptvnator/releases"><img src="https://img.shields.io/github/release/4gray/iptvnator.svg?style=for-the-badge&logo=github" alt="Release"></a> <img alt="GitHub Workflow Status" src="https://img.shields.io/github/actions/workflow/status/4gray/iptvnator/ci.yaml?style=for-the-badge"> <a href="https://github.com/4gray/iptvnator/releases"><img src="https://img.shields.io/github/downloads/4gray/iptvnator/total?style=for-the-badge&logo=github" alt="Releases"></a> <a href="https://codecov.io/gh/4gray/iptvnator"><img alt="Codecov" src="https://img.shields.io/codecov/c/github/4gray/iptvnator?style=for-the-badge"></a> <a href="https://t.me/iptvnator"><img src="https://img.shields.io/badge/telegram-iptvnator-blue?logo=telegram&style=for-the-badge" alt="Telegram"></a>
-</p>
+**IPTVnator** 是一款跨平台、开源的 IPTV 播放器，支持播放和管理 m3u/m3u8 播放列表。你可以通过远程 URL 或本地文件导入播放列表；同时支持基于 XMLTV 的节目单（EPG）。本项目在上游开源项目 [4gray/iptvnator](https://github.com/4gray/iptvnator) 的基础上持续打磨与增强。
 
-<a href="https://t.me/iptvnator">Telegram channel for discussions</a>
+应用基于 Electron 和 Angular 开发，支持 Windows、macOS 与 Linux。
 
-**IPTVnator** is a video player application that provides support for the playback of IPTV playlists (m3u, m3u8). The application allows to import playlists by using remote URLs or per file upload from the file system. Additionally there is a support of EPG information XMLTV-based which can be provided by URL.
+⚠️ 说明：IPTVnator 不提供任何播放列表或数字内容。截图中的频道与图片仅用于演示。
 
-The application is a cross-platform and open source project based on Electron and Angular.
+## 针对中国 IPTV 的客观优化说明
 
-⚠️ Note: IPTVnator doesn't provide any playlists or other digital content. The channels and pictures in the screenshots are for demonstration purposes only.
+以下能力在不改变上游项目整体架构的前提下进行增强，旨在更好适配中国大陆常见的 IPTV 使用场景。实现方式为在播放器选择、EPG 匹配与地址规范化等方面提供可选策略与兼容性处理，不包含任何内置源或服务：
 
-![IPTVnator: Channels list, player and epg list](./iptv-dark-theme.png)
+- 组播与单播适配
+  - 自动识别组播/网关（udp/rtp/239.x、.ts/.flv/.mpegts 等）与单播（m3u8/mp4 等）来源
+  - 组播优先采用 mpegts.js，单播统一采用 HTML5（集成 hls.js）以提升兼容性
+  - 源地址中 “$” 之后的扩展标注仅用于显示与识别，实际播放前会自动剥离并清理空参数
+- 回放（时移）支持
+  - 支持基于 XMLTV 的回放模板，兼容常见两类格式（形如 {utc}/{utcend} 与 ${b}/{e} 形式）
+  - 默认支持 7 天时移窗口（可被频道自身 timeshift/catchup.days 覆盖）
+  - 首次直接回放时进行地址合法化与播放器预选，减少因空参数或内核不匹配导致的失败
+- 4K/画质策略
+  - 单播 4K 直播与回放默认采用 HTML5（hls.js），以提高高码率播放稳定性
+  - 频道切源时按“组播/单播-UHD/HD/SD-xxfps”显示来源标签，便于快速识别
+- EPG 匹配与可视化
+  - 增强频道名称匹配：在有 tvg-id 时优先精确匹配；名称匹配加入归一化（去除空格/符号/画质标识、统一 CCTV/卫视常见写法）与模糊包含策略
+  - 节目单状态中文化与高亮：直播/待播/已播；当前直播标红，回放标绿；信息浮层同步显示“正在直播/正在回放”
+- 频道列表体验
+  - 统一矩形台标（48×32，等比居中，白底），无台标时使用内置占位图
+  - 同名频道源合并（保留 4K/非 4K 区分），顶部工具栏便捷切源
 
-## Features
+![IPTVnator: 主界面](./iptv-dark-theme.png)
 
-- M3u and M3u8 playlists support 📺
-- Xtream Code (XC) and Stalker portal (STB) support
-- External player support - mvp, VLC
-- Add playlists from file system or from remote URL 📂
-- Playlists auto-update feature on app startup
-- Search for channels 🔍
-- EPG support (TV Guide) with detailed info
-- TV archive/catchup/timeshift
-- Group-based channels list
-- Save channels as favorites
-- Global favorites aggregated from all playlists
-- HTML video player with hls.js support or Video.js based player
-- Internalization, currently 8 languages are supported (en, ru, de, ko, es, zh, fr, it)
-- Set custom "User Agent" header for a playlist
-- Light and Dark theme
-- Version for self-hosted docker is available
+## 功能特性
 
-## Screenshots:
+- 支持 m3u 与 m3u8 播放列表 📺
+- 支持 Xtream Code (XC) 与 Stalker portal (STB)
+- 支持外部播放器（mpv、VLC）
+- 从本地文件或远程 URL 添加播放列表 📂
+- 应用启动时自动更新播放列表
+- 频道搜索 🔍
+- 支持 EPG（电视节目单），展示详细信息
+- 电视存档/时移/回看
+- 按分组显示频道
+- 收藏频道并统一管理
+- 支持 HTML 播放器（hls.js）或基于 Video.js 的播放器
+- 内置多语言（目前支持 en, ru, de, ko, es, zh, fr, it）
+- 可为播放列表设置自定义 User-Agent
+- 明暗主题切换
+- 提供可自托管的 Docker 版本
 
-| Welcome screen: Playlists overview                           | Main player interface with channels sidebar and video player                |
-| :----------------------------------------------------------: | :-------------------------------------------------------: |
-| ![Welcome screen: Playlists overview](./playlists.png)       | ![Sidebar with channel and video player](./iptv-main.png) |
-| Welcome screen: Add playlist via file upload                | Welcome screen: Add playlist via URL                      |
-| ![Welcome screen: Add playlist via file upload](./iptv-upload.png) | ![Welcome screen: Add playlist via URL](./upload-via-url.png)             |
-| EPG Sidebar: TV guide on the right side                | General application settings
-| ![EPG: TV guide on the right side](./iptv-epg.png) | ![General app settings](./iptv-settings.png) |
-| Playlist settings                |
-| ![Playlist settings](./iptv-playlist-settings.png) |  |
+## 下载
 
-*Note: First version of the application which was developed as a PWA is available in an extra git branch.*
-
-## Download
-
-Download the latest version of the application for macOS, Windows and Linux from the [release page](https://github.com/4gray/iptvnator/releases).
-
-**IPTVnator** is also available as a snap package:
+- 前往 [Releases 页面](https://github.com/CGG888/iptvnator/releases) 获取适用于 macOS、Windows、Linux 的最新安装包。
+- Snap 包：
 
 ```
 $ sudo snap install iptvnator
 ```
 
-Also available as an Arch PKG, [iptvnator-bin](https://aur.archlinux.org/packages/iptvnator-bin/), in the AUR (using your favourite AUR-helper, .e.g. `yay`)
+- Arch Linux（AUR）：[iptvnator-bin](https://aur.archlinux.org/packages/iptvnator-bin/)
+
 ```
 $ yay -S iptvnator-bin
 ```
 
 [![Get it from the Snap Store](https://snapcraft.io/static/images/badges/en/snap-store-black.svg)](https://snapcraft.io/iptvnator)
 
-<a href="https://github.com/sponsors/4gray" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/default-green.png" alt="Buy Me A Coffee" width="185"></a>
+## 自托管（Docker）
 
-## How to build
+如果你想在本地以 PWA 方式运行，可参考 [docker/README.md](./docker/README.md) 获取前后端启动与构建说明。
 
-Requirements: node.js with npm.
+## 本地构建
 
-1. Clone this repository and install all project dependencies with:
-   ```
-   $ npm install
-   ```
+前置条件：已安装 Node.js 与 npm。
 
-2. To build the application on your local machine use one of the following commands:
-   ```
-   # linux
-   $ npm run electron:build:linux
-   ```
+1. 安装依赖：
 
-   ```
-   #mac
-   $ npm run electron:build:mac
-   ```
+```
+$ npm install
+```
 
-   ```
-   # windows
-   $ npm run electron:build:windows
-   ```
+2. 构建桌面应用：
 
-This command will produce the distributable assets in the `release` folder based on the configuration from electron-builder which is stored in `electron-builder.json` and `package.json`. Check the [API description of electron-builder](https://www.electron.build/) and adapt the configuration if you need some special configuration for you environment.
+```
+# Linux
+$ npm run electron:build:linux
 
-*Note: Don’t expect that you can build app for all platforms on one platform. [Read details](https://www.electron.build/multi-platform-build)*
+# macOS
+$ npm run electron:build:mac
 
-## Development
+# Windows
+$ npm run electron:build:windows
+```
 
-The first thing to do is to install all the necessary dependencies:
+构建产物将输出到 `release` 目录；打包配置位于 `electron-builder.json` 与 `package.json`。如需跨平台构建的注意事项，请参考 [electron-builder 文档](https://www.electron.build/)。
 
-  ```
-  $ npm install
-  ```
+> 注：不要期望在单一平台为所有平台构建应用，详情见上游文档的多平台构建说明。
 
-To develop an application in PWA and Electron mode, you need to run the application with a command:
+## 开发调试
 
-  ```
-  $ npm run start
-  ```
+安装依赖后运行：
 
-The Electron version of the application will open in a separate window, and the PWA version will be available in the browser at http://localhost:4200.
+```
+$ npm run start
+```
 
-If you want to run only the angular app without electron, in this case you can use the command:
+Electron 版本会以独立窗口打开；PWA 版本可在浏览器访问 http://localhost:4200。
 
-  ```
-  $ npm run ng:serve
-  ```
+仅运行 Angular 前端：
 
+```
+$ npm run ng:serve
+```
 
-## Disclaimer
+## 回放格式示例与说明
 
-IPTVnator doesn't provide any playlists or other digital content.
+支持两类常见 EPG 回放模板，播放器会根据所选节目单的起止时间自动替换模板中的时间占位符并生成可播放的回放地址：
+- 模板一：`{utc:yyyyMMddHHmmss}` 与 `{utcend:yyyyMMddHHmmss}`
+- 模板二：`${(b)yyyyMMdd|UTC}T${(b)HHmmss|UTC}` 与 `${(e)yyyyMMdd|UTC}T${(e)HHmmss|UTC}`
 
-<!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-13-orange.svg?style=flat-square)](#contributors)
-<!-- ALL-CONTRIBUTORS-BADGE:END -->
+说明与规则：
+- 频道项中的 `catchup="default"` 与 `catchup-source="..."` 用于提供回放模板；点击 EPG 中的节目时，应用会以节目 UTC 起止时间替换模板生成实际回放 URL。
+- 直播源地址中 `$` 之后的文本仅用于在界面上展示来源标签（如“组播超高清-50.00fps”），不会参与真实播放；应用会自动剥离 `$` 及其后的内容，并清理空查询参数。
+- 组播/TS 流直播优先使用 mpegts.js；单播与回放统一使用 HTML5（集成 hls.js）。4K 单播直播与回放也使用 HTML5。
+- 若频道未提供 `catchup-source`，则该频道不支持回放。
+- 未在频道中声明时移窗口时，默认窗口为 7 天（可被频道自身 `timeshift`/`catchup.days` 等参数覆盖）。
+
+示例1：
+
+```m3u
+#EXTINF:-1 tvg-id="北京卫视4K" tvg-name="北京卫视4K" tvg-logo="https://cdn.example.com/logo/beijing-4k.png" group-title="4K频道" catchup="default" catchup-source="https://catchup.example.com/asset/201500000638/index.m3u8?starttime={utc:yyyyMMddHHmmss}&endtime={utcend:yyyyMMddHHmmss}",北京卫视4K
+http://gateway.example/rtp/239.0.0.1:9000$组播超高清-50.00fps
+
+#EXTINF:-1 tvg-id="北京卫视" tvg-name="北京卫视" tvg-logo="https://cdn.example.com/logo/beijing.png" group-title="4K频道" catchup="default" catchup-source="https://catchup.example.com/asset/201500000065/index.m3u8?starttime={utc:yyyyMMddHHmmss}&endtime={utcend:yyyyMMddHHmmss}",北京卫视4K
+http://gateway.example/rtp/239.0.0.2:9000$组播超高清-25.00fps
+
+#EXTINF:-1 tvg-id="" tvg-name="北京卫视4K" tvg-logo="https://cdn.example.com/logo/beijing-4k.png" group-title="4K频道" catchup="default" catchup-source="https://catchup.example.com/asset/201500000638/index.m3u8?starttime={utc:yyyyMMddHHmmss}&endtime={utcend:yyyyMMddHHmmss}",北京卫视4K
+https://live.example.com/asset/201500000638/index.m3u8?starttime=$单播$单播超高清-50.00fps
+```
+
+示例2：
+
+```m3u
+#EXTINF:-1 tvg-id="北京卫视4K" tvg-name="北京卫视4K" tvg-logo="https://cdn.example.com/logo/beijing-4k.png" group-title="4K频道" catchup="default" catchup-source="https://catchup.example.com/asset/201500000638/index.m3u8?starttime=${(b)yyyyMMdd|UTC}T${(b)HHmmss|UTC}&endtime=${(e)yyyyMMdd|UTC}T${(e)HHmmss|UTC}",北京卫视4K
+http://gateway.example/rtp/239.0.0.1:9000$组播超高清-50.00fps
+
+#EXTINF:-1 tvg-id="" tvg-name="北京卫视4K" tvg-logo="https://cdn.example.com/logo/beijing-4k.png" group-title="4K频道" catchup="default" catchup-source="https://catchup.example.com/asset/201500000640/index.m3u8?starttime=${(b)yyyyMMdd|UTC}T${(b)HHmmss|UTC}&endtime=${(e)yyyyMMdd|UTC}T${(e)HHmmss|UTC}",北京卫视4K
+https://live.example.com/asset/201500000640/index.m3u8?starttime=$单播$单播超高清-25.00fps
+```
+
+## 免责声明
+
+IPTVnator 不提供任何播放列表或其他数字内容。
+
+## 项目来源
+
+本仓库来源于 GitHub 上的开源项目 [4gray/iptvnator](https://github.com/4gray/iptvnator)。项目由上游社区发起并维护，采用 MIT 许可证。在此感谢上游作者与所有贡献者。
+
+## 致谢
+
+本项目基于上游仓库持续演进，特别感谢原项目及其维护者：
+- 原仓库地址：https://github.com/4gray/iptvnator
+
+许可证见 [LICENSE.md](./LICENSE.md)。

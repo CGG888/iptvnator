@@ -8,5 +8,5 @@ jobs:
     steps:
       - uses: vedantmgoyal2009/winget-releaser@v1
         with:
-          identifier: 4gray.iptvnator
+          identifier: CGG888.iptvnator
           token: ${{ secrets.PAT }}

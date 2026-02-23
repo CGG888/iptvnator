@@ -15,6 +15,9 @@ export class InfoOverlayComponent implements OnChanges {
     /** Current EPG program */
     @Input() epgProgram: EpgProgram | undefined;
 
+    /** Whether player UI/controls are active (mouse activity) */
+    @Input() controlsActive = true;
+
     /** Visibility flag of the overlay popup  */
     isVisible = false;
 
@@ -32,6 +35,8 @@ export class InfoOverlayComponent implements OnChanges {
 
     /** Timeout for the overlay visibility */
     currentTimeout;
+    isReplay = false;
+    isLive = false;
 
     /**
      * Calculates the necessary information for the visualization in the overview popup
@@ -48,8 +53,17 @@ export class InfoOverlayComponent implements OnChanges {
         if (changes.epgProgram && changes.epgProgram.currentValue) {
             const { stop, start } = changes.epgProgram.currentValue;
             this.setProgramDuration(start, stop);
+            clearTimeout(this.currentTimeout);
+            this.isVisible = true;
+            this.currentTimeout = setTimeout(() => {
+                this.isVisible = false;
+            }, 4000);
+            const now = moment(Date.now()).format('YYYYMMDDHHmm ZZ');
+            this.isReplay = now > stop;
+            this.isLive = now >= start && now <= stop;
         }
     }
+
 
     /**
      * Calculates and sets the duration of the program for the progress bar visualization

@@ -10,7 +10,7 @@ import {
 import Hls from 'hls.js';
 import { Channel } from '../../../../../shared/channel.interface';
 import { CHANNEL_SET_USER_AGENT } from '../../../../../shared/ipc-commands';
-import { getExtensionFromUrl } from '../../../../../shared/playlist.utils';
+import { getExtensionFromUrl, getPlaybackUrl, stripAfterDollar } from '../../../../../shared/playlist.utils';
 import { DataService } from '../../../services/data.service';
 
 /**
@@ -58,8 +58,8 @@ export class HtmlVideoPlayerComponent implements OnChanges, OnDestroy {
     playChannel(channel: Channel): void {
         if (this.hls) this.hls.destroy();
         if (channel.url) {
-            const url = channel.url + (channel.epgParams ?? '');
-            const extension = getExtensionFromUrl(channel.url);
+            const url = getPlaybackUrl(channel as any);
+            const extension = getExtensionFromUrl(stripAfterDollar(channel.url));
             this.dataService.sendIpcEvent(CHANNEL_SET_USER_AGENT, {
                 userAgent: channel.http?.['user-agent'] ?? '',
                 referer: channel.http?.referrer ?? '',

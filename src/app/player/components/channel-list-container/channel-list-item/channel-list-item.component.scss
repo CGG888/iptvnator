@@ -13,6 +13,14 @@
 }
 
 ::ng-deep {
+    .mat-mdc-list-item-avatar.channel-logo {
+        width: 48px !important;
+        height: 32px !important;
+        border-radius: 4px !important;
+        object-fit: contain;
+        background: #fff;
+    }
+
     .dark-theme {
         .active {
             background: #000;

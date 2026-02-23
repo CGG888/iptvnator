@@ -25,15 +25,18 @@
                 [icon]="activeChannel?.tvg?.logo"
             />
             <ng-template #videoPlayer>
-                <!-- video.js player -->
+                <div class="player-surface"
+                     [class.player-html5]="chosenPlayer === 'html5'"
+                     [class.player-mpegts]="chosenPlayer === 'mpegts'"
+                     [class.player-videojs]="chosenPlayer === 'videojs'"
+                     (mousemove)="onUiMouseMove()"
+                     (mouseleave)="onUiMouseLeave()">
                 <app-vjs-player
-                    *ngIf="playerSettings.player === 'videojs'"
+                    *ngIf="chosenPlayer === 'videojs'"
                     [options]="{
                         sources: [
                             {
-                                src:
-                                    activeChannel?.url +
-                                    activeChannel?.epgParams,
+                                src: getActiveSrc(activeChannel),
                                 type: 'application/x-mpegURL',
                             },
                         ],
@@ -41,15 +44,18 @@
                     [class.hide-captions]="!playerSettings.showCaptions"
                 ></app-vjs-player>
 
-                <!-- default html player component -->
                 <app-html-video-player
-                    *ngIf="playerSettings.player === 'html5'"
+                    *ngIf="chosenPlayer === 'html5'"
                     [channel]="activeChannel"
                     [showCaptions]="playerSettings.showCaptions"
                 />
+                <app-mpegts-player
+                    *ngIf="chosenPlayer === 'mpegts'"
+                    [channel]="activeChannel"
+                />
                 <div
                     class="custom-player"
-                    *ngIf="playerSettings.player === 'mpv'"
+                    *ngIf="chosenPlayer === 'mpv'"
                 >
                     <img src="./assets/images/custom-player.png" />
                     <p>
@@ -68,7 +74,7 @@
                 </div>
                 <div
                     class="custom-player"
-                    *ngIf="playerSettings.player === 'vlc'"
+                    *ngIf="chosenPlayer === 'vlc'"
                 >
                     <img src="./assets/images/custom-player.png" />
                     <p>
@@ -82,7 +88,9 @@
                 <app-info-overlay
                     [channel]="activeChannel"
                     [epgProgram]="epgProgram$ | async"
+                    [controlsActive]="uiActive"
                 ></app-info-overlay>
+                </div>
             </ng-template>
         </ng-container>
     </mat-drawer-content>

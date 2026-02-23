@@ -7,7 +7,7 @@ import { Theme } from './../settings/theme.enum';
 
 /** Url of the package.json file in the app repository, required to get the version of the released app */
 const PACKAGE_JSON_URL =
-    'https://raw.githubusercontent.com/4gray/iptvnator/master/package.json';
+    'https://raw.githubusercontent.com/CGG888/iptvnator/electron/package.json';
 
 @Injectable({
     providedIn: 'root',

@@ -1,6 +1,6 @@
 .channel-overlay {
     position: absolute;
-    bottom: 35px;
+    bottom: 96px;
     width: 100%;
     background: #2c2b2fdc;
     min-height: 130px;
@@ -13,6 +13,22 @@
     flex-direction: row;
     box-sizing: border-box;
     display: flex;
+    pointer-events: none; /* 不拦截鼠标事件，保证播放器控件可正常感知鼠标 */
+    z-index: 1; /* 让控制条（通常更高 z-index）显示在上层，避免遮挡 */
+}
+
+:host-context(.player-html5) .channel-overlay {
+    bottom: 110px;
+}
+
+:host-context(.player-mpegts) .channel-overlay {
+    bottom: 96px;
+}
+
+@media (max-width: 768px) {
+    .channel-overlay {
+        bottom: 72px;
+    }
 }
 
 .program-name,
@@ -22,6 +38,37 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.program-title-row {
+    width: 96%;
+    margin: 8px 0 12px;
+    display: flex;
+    align-items: center;
+}
+
+.program-title {
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.badge {
+    border-radius: 2px;
+    padding: 2px 6px;
+    color: #fff;
+    text-transform: uppercase;
+    margin-left: 8px;
+    font-size: 0.85em;
+}
+
+.live {
+    background-color: red;
+}
+
+.rec {
+    background-color: #2e7d32;
 }
 
 .channel-logo {
@@ -44,6 +91,7 @@
     width: 96%;
     background: #ccc;
     height: 20px;
+    margin-top: 8px;
     margin-bottom: 8px;
 }
 

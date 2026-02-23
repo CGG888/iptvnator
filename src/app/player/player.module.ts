@@ -15,15 +15,19 @@ import { SidebarComponent } from './components/video-player/sidebar/sidebar.comp
 import { ToolbarComponent } from './components/video-player/toolbar/toolbar.component';
 import { VideoPlayerComponent } from './components/video-player/video-player.component';
 import { VjsPlayerComponent } from './components/vjs-player/vjs-player.component';
+import { MpegtsPlayerComponent } from './components/mpegts-player/mpegts-player.component';
+import { MatMenuModule } from '@angular/material/menu';
 
 const routes: Routes = [{ path: '', component: VideoPlayerComponent }];
 
 @NgModule({
     imports: [
+        MatMenuModule,
         AudioPlayerComponent,
         CommonModule,
         EpgItemDescriptionComponent,
         HtmlVideoPlayerComponent,
+        MpegtsPlayerComponent,
         OverlayModule,
         RecentPlaylistsComponent,
         RouterModule.forChild(routes),

@@ -120,26 +120,91 @@ ipcRenderer.on(EPG_FETCH, (event, epgUrl: string) => {
     fetchEpgDataFromUrl(epgUrl);
 });
 
+// --- Improved matching utils for channel <-> EPG ---
+const normalize = (str: string) => {
+    if (!str) return '';
+    return String(str)
+        .toLowerCase()
+        .replace(/\s+/g, '')
+        .replace(/[【】\[\]\(\)\-_.·]/g, '')
+        .replace(/频道|频道高清|频道超清|频道超高清|频道标清|台/g, '')
+        .replace(/超高清|超清|标清|高清|uhd|4k|hd|sd/g, '')
+        .replace(/cctv-?/g, 'cctv')
+        .replace(/央视频道/g, '')
+        .replace(/湖南卫视高清/g, '湖南卫视')
+        .replace(/北京卫视高清/g, '北京卫视')
+        .replace(/东方卫视高清/g, '东方卫视')
+        .trim();
+};
+
+const epgChannelHasName = (epgChannel, predicate: (s: string) => boolean) => {
+    return epgChannel?.name?.some(
+        (n) => n?.value && predicate(String(n.value))
+    );
+};
+
+const findBestMatchingEpgChannel = (
+    channelName?: string,
+    tvgId?: string,
+    tvgName?: string
+) => {
+    if (!EPG_DATA || !EPG_DATA.channels) return undefined;
+    // 1) Exact tvg-id match
+    if (tvgId) {
+        const byId = EPG_DATA.channels.find((c) => c.id === tvgId);
+        if (byId) return byId;
+    }
+    const candidates = EPG_DATA.channels;
+    const srcNames = [
+        channelName?.trim() || '',
+        tvgName?.trim() || '',
+    ].filter(Boolean);
+    const normSrc = srcNames.map(normalize).filter(Boolean);
+
+    // 2) Exact trim/case-insensitive
+    for (const epgCh of candidates) {
+        if (
+            epgChannelHasName(epgCh, (v) =>
+                srcNames.includes(String(v).trim())
+            )
+        ) {
+            return epgCh;
+        }
+    }
+    // 3) Normalized equality
+    for (const epgCh of candidates) {
+        if (
+            epgChannelHasName(epgCh, (v) => {
+                const nv = normalize(v);
+                return normSrc.includes(nv);
+            })
+        ) {
+            return epgCh;
+        }
+    }
+    // 4) Includes/substring after normalization
+    for (const epgCh of candidates) {
+        const epgNormNames =
+            epgCh?.name?.map((n) => normalize(n?.value || '')) || [];
+        if (
+            epgNormNames.some(
+                (en) => en && normSrc.some((ns) => ns.includes(en) || en.includes(ns))
+            )
+        ) {
+            return epgCh;
+        }
+    }
+    return undefined;
+};
+
 // returns the epg data for the provided channel name and date
 ipcRenderer.on(EPG_GET_PROGRAM, (event, args) => {
     const channelName = args.channel?.name;
     const tvgId = args.channel?.tvg?.id;
+    const tvgName = args.channel?.tvg?.name;
     if (!EPG_DATA || !EPG_DATA.channels) return;
-    const foundChannel = EPG_DATA?.channels?.find((epgChannel) => {
-        if (tvgId && tvgId === epgChannel.id) {
-            return epgChannel;
-        } else if (
-            epgChannel.name.find((nameObj) => {
-                if (
-                    nameObj.value &&
-                    nameObj.value.trim() === channelName.trim()
-                )
-                    return nameObj;
-            })
-        ) {
-            return epgChannel;
-        }
-    });
+    const foundChannel =
+        findBestMatchingEpgChannel(channelName, tvgId, tvgName) || null;
 
     if (foundChannel) {
         const programs = EPG_DATA?.programs?.filter(

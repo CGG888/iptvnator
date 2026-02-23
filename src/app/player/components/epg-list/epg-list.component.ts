@@ -80,15 +80,20 @@ export class EpgListComponent {
         this.timeshiftUntil$ = this.store.select(selectActive).pipe(
             // eslint-disable-next-line @ngrx/avoid-mapping-selectors
             map((active) => {
-                return (
-                    active?.tvg?.rec ||
-                    active?.timeshift ||
-                    active?.catchup?.days
-                );
+                const raw =
+                    (active?.tvg?.rec as any) ??
+                    (active?.timeshift as any) ??
+                    (active?.catchup?.days as any);
+                const parsed =
+                    typeof raw === 'number'
+                        ? raw
+                        : parseInt(String(raw ?? ''), 10);
+                const days = Number.isFinite(parsed) && parsed > 0 ? parsed : 7;
+                return days;
             }),
-            map((value) =>
+            map((days) =>
                 moment(Date.now())
-                    .subtract(value, 'days')
+                    .subtract(days, 'days')
                     .format(DATE_TIME_FORMAT)
             )
         );
@@ -182,6 +187,7 @@ export class EpgListComponent {
             this.store.dispatch(setActiveEpgProgram({ program }));
         }
         this.playingNow = program;
+        this.store.dispatch(setCurrentEpgProgram({ program }));
     }
 
     /**

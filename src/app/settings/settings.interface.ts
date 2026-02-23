@@ -6,8 +6,10 @@ import { Theme } from './theme.enum';
  * TODO: extract to separate file
  */
 export enum VideoPlayer {
+    Auto = 'auto',
     VideoJs = 'videojs',
     Html5Player = 'html5',
+    Mpegts = 'mpegts',
     MPV = 'mpv',
     VLC = 'vlc',
 }

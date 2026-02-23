@@ -29,7 +29,7 @@
                 <mat-icon>chevron_left</mat-icon>
             </button>
             <span class="selected-date">
-                {{ dateToday | momentDate: 'YYYYMMDD' : 'MMMM Do, dddd' }}</span
+                {{ dateToday | momentDate: 'YYYYMMDD' : 'LL dddd' }}</span
             >
             <button
                 class="next-day"
@@ -58,14 +58,15 @@
                         else timeshiftItem
                     "
                 >
+                    <div matListItemTitle>{{ item?.title[0]?.value }}</div>
                     <div matListItemLine>
                         <app-epg-list-item
                             [timeshiftUntil]="timeshiftUntil"
                             [timeNow]="timeNow"
+                            [activeProgram]="playingNow"
                             [item]="item"
                         ></app-epg-list-item>
                     </div>
-                    <p matListItemLine>{{ item?.title[0]?.value }}</p>
                 </mat-list-option>
                 <ng-template #timeshiftItem>
                     <mat-list-option
@@ -81,17 +82,15 @@
                             )
                         "
                     >
+                        <div matListItemTitle [innerHTML]="item?.title[0]?.value"></div>
                         <div matListItemLine>
                             <app-epg-list-item
                                 [timeshiftUntil]="timeshiftUntil"
                                 [timeNow]="timeNow"
+                                [activeProgram]="playingNow"
                                 [item]="item"
                             ></app-epg-list-item>
                         </div>
-                        <p
-                            matListItemLine
-                            [innerHTML]="item?.title[0]?.value"
-                        ></p>
                     </mat-list-option>
                 </ng-template>
                 <mat-divider></mat-divider>

@@ -8,9 +8,13 @@ export const playlistReducer = createReducer(
     initialState,
     on(PlaylistActions.setActiveEpgProgram, (state, action): PlaylistState => {
         const { program } = action;
-        const from = moment(program.start, 'YYYYMMDDHHmm ZZ').unix();
-        const now = moment(Date.now()).unix();
-        const epgParams = `?utc=${from}&lutc=${now}`;
+        const startUtc = moment(program.start, 'YYYYMMDDHHmm ZZ')
+            .utc()
+            .format('YYYYMMDDHHmmss');
+        const endUtc = moment(program.stop, 'YYYYMMDDHHmm ZZ')
+            .utc()
+            .format('YYYYMMDDHHmmss');
+        const epgParams = `catchup:${startUtc}:${endUtc}`;
         return {
             ...state,
             active: { ...state.active, epgParams },

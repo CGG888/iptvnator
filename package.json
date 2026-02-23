@@ -2,7 +2,7 @@
     "name": "iptvnator",
     "version": "0.16.1",
     "description": "IPTV player application.",
-    "homepage": "https://github.com/4gray/iptvnator",
+    "homepage": "https://github.com/CGG888/iptvnator",
     "author": {
         "name": "4gray",
         "email": "dev@artslab.info"
@@ -55,6 +55,7 @@
         "@angular/animations": "18.2.1",
         "@angular/cdk": "18.2.1",
         "@angular/material": "18.2.1",
+        "mpegts.js": "1.7.3",
         "@electron/remote": "2.1.2",
         "@ngrx/component-store": "18.0.2",
         "@ngrx/effects": "18.0.2",

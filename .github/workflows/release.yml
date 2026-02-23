@@ -3,10 +3,50 @@ on:
   push:
     branches:
       - electron
+    paths:
+      - 'package.json'
   workflow_dispatch:
 jobs:
+  check_version:
+    name: Check version change
+    runs-on: ubuntu-latest
+    outputs:
+      should_release: ${{ steps.diff.outputs.changed }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Detect version change
+        id: diff
+        shell: bash
+        run: |
+          NEW_VERSION=$(node -p "require('./package.json').version")
+          if git cat-file -e "${{ github.event.before }}^{commit}" 2>/dev/null; then
+            git show "${{ github.event.before }}:package.json" > /tmp/old_pkg.json || true
+          fi
+          if [ -s /tmp/old_pkg.json ]; then
+            OLD_VERSION=$(node -e "const fs=require('fs'); const s=fs.readFileSync('/tmp/old_pkg.json','utf8'); try{console.log(JSON.parse(s).version)}catch(e){console.log('')}")
+          else
+            OLD_VERSION=""
+          fi
+          echo "New: $NEW_VERSION, Old: $OLD_VERSION"
+          if [ -n "$OLD_VERSION" ] && [ "$NEW_VERSION" != "$OLD_VERSION" ]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+
   package:
     runs-on: ${{ matrix.os }}
+    needs: check_version
+    if: needs.check_version.outputs.should_release == 'true' || github.event_name == 'workflow_dispatch'
     env:
       SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_TOKEN }}
 
@@ -29,8 +69,7 @@ jobs:
         if: startsWith(matrix.os, 'ubuntu')
         with:
           # Log in to Snap Store
-          snapcraft_token: ${{ secrets.snapcraft_token }}
-          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.snapcraft_token }}
+          snapcraft_token: ${{ secrets.SNAPCRAFT_TOKEN }}
       
       - name: Package Linux
         if: startsWith(matrix.os, 'ubuntu')
@@ -54,7 +93,7 @@ jobs:
         with:
           # GitHub token, automatically provided to the action
           # (No need to define this secret in the repo settings)
-          github_token: ${{ secrets.github_token }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
           # If the commit is tagged with a version (e.g. "v1.0.0"),
           # release the app after building
@@ -66,7 +105,7 @@ jobs:
         with:
           # GitHub token, automatically provided to the action
           # (No need to define this secret in the repo settings)
-          github_token: ${{ secrets.github_token }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
           # If the commit is tagged with a version (e.g. "v1.0.0"),
           # release the app after building

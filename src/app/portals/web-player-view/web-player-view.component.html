@@ -1,5 +1,7 @@
 @if (player === 'videojs') {
     <app-vjs-player [options]="vjsOptions" />
 } @else if (player === 'html5') {
-    <app-html-video-player *ngIf="player === 'html5'" [channel]="channel" />
+    <app-html-video-player [channel]="channel" />
+} @else if (player === 'mpegts') {
+    <app-mpegts-player [channel]="channel" />
 }

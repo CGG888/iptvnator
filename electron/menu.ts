@@ -97,7 +97,7 @@ export class AppMenu {
                     label: 'Report a bug',
                     click: () => {
                         shell.openExternal(
-                            'https://github.com/4gray/iptvnator'
+                            'https://github.com/CGG888/iptvnator'
                         );
                     },
                 },

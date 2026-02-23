@@ -113,7 +113,7 @@
     "SHOW_CAPTIONS": "Show subtitles",
     "ADD_EPG_SOURCE": "Add EPG source",
     "EPG_URL_ERROR": "The value is not a valid URL",
-    "VIDEO_PLAYER_DESCRIPTION": "Select default video player",
+    "VIDEO_PLAYER_DESCRIPTION": "Select default video player. Auto: m3u8→Video.js; ts/flv/mpegts→mpegts.js; mp4→HTML5.",
     "LANGUAGE_DESCRIPTION": "Select language of the application",
     "THEME_DESCRIPTION": "Select visual theme of the application",
     "SHOW_CAPTIONS_DESCRIPTION": "Show or hide subtitles by default",
@@ -169,14 +169,17 @@
     "OPEN_CHANNELS_LIST": "Open channel list",
     "TOGGLE_FAVORITE_FLAG": "Toggle favorite flag",
     "OPEN_EPG_LIST": "Open EPG list",
-    "OPEN_MULTI_EPG": "Open Multi-EPG view"
+    "OPEN_MULTI_EPG": "Open Multi-EPG view",
+    "SWITCH_SOURCE": "Switch source"
   },
   "EPG": {
     "TITLE": "Electronic Program Guide",
     "NEXT_DAY": "Next day",
     "PREVIOUS_DAY": "Previous day",
     "LIVE_NOW": "Live now",
+    "UPCOMING": "Upcoming",
     "LIVE_STREAM": "Live stream",
+    "REPLAYING": "Replaying",
     "TIMESHIFT_AVAILABLE": "Timeshift is available, click to play",
     "EPG_NOT_AVAILABLE_DATE": "Ooops, EPG is not available for the selected date",
     "EPG_NOT_AVAILABLE_CHANNEL_TITLE": "Ooops, EPG is not available for this channel.",

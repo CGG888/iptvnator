@@ -1,8 +1,8 @@
 <div
     class="channel-overlay"
     *ngIf="channel && epgProgram"
-    [class.visible]="isVisible"
-    [class.hidden]="!isVisible"
+    [class.visible]="controlsActive"
+    [class.hidden]="!controlsActive"
 >
     <div class="channel-logo">
         <img
@@ -12,8 +12,12 @@
         />
     </div>
     <div class="content">
-        <div class="program-name">
-            {{ epgProgram?.title[0]?.value }} | {{ channel.name }}
+        <div class="program-title-row">
+            <div class="program-title">
+                {{ epgProgram?.title[0]?.value }} | {{ channel.name }}
+            </div>
+            <span *ngIf="isLive" class="badge live">正在直播</span>
+            <span *ngIf="!isLive && isReplay" class="badge rec">正在回放</span>
         </div>
         <div class="program-description">
             {{ epgProgram?.desc[0]?.value }}

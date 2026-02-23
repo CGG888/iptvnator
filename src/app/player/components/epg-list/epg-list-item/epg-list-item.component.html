@@ -7,7 +7,13 @@
     *ngIf="timeNow >= item.start && timeNow <= item.stop"
     class="live badge"
     [matTooltip]="'EPG.LIVE_NOW' | translate"
-    >live</span
+    >{{ isActiveProgram() ? '正在直播' : '直播' }}</span
+>
+<span
+    *ngIf="item.start > timeNow"
+    class="upcoming badge"
+    [matTooltip]="'EPG.UPCOMING' | translate"
+    >待播</span
 >
 <span
     *ngIf="
@@ -17,7 +23,7 @@
     "
     class="rec badge"
     [matTooltip]="'EPG.TIMESHIFT_AVAILABLE' | translate"
-    >r</span
+    >{{ isActiveProgram() ? '正在回放' : '已播' }}</span
 >
 <span
     (click)="$event.stopPropagation(); showDescription(item)"

@@ -32,6 +32,7 @@ import {
     selectCurrentEpgProgram,
 } from '../../../state/selectors';
 import { MultiEpgContainerComponent } from '../multi-epg/multi-epg-container.component';
+import { getPlaybackUrl, isMpegtsLikeUrl, stripAfterDollar } from '../../../../../shared/playlist.utils';
 
 /** Possible sidebar view options */
 export type SidebarView = 'CHANNELS' | 'PLAYLISTS';
@@ -61,6 +62,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         player: VideoPlayer.VideoJs,
         showCaptions: false,
     };
+    chosenPlayer: VideoPlayer | 'mpegts' = VideoPlayer.VideoJs;
 
     /** IPC Renderer commands list with callbacks */
     commandsList = [
@@ -102,6 +104,11 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     /** EPG overlay reference */
     overlayRef: OverlayRef;
 
+    /** UI activity state for syncing overlay with player controls */
+    uiActive = true;
+    private uiTimer: any;
+    private uiIdleMs = 2500;
+
     constructor(
         private activatedRoute: ActivatedRoute,
         private dataService: DataService,
@@ -121,6 +128,12 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         this.applySettings();
         this.setRendererListeners();
         this.getPlaylistUrlAsParam();
+
+        this.activeChannel$.subscribe((channel) => {
+            if (channel?.url) {
+                this.choosePlayerByChannel(channel);
+            }
+        });
 
         this.channels$ = this.activatedRoute.params.pipe(
             combineLatestWith(this.activatedRoute.queryParams),
@@ -209,6 +222,34 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         });
     }
 
+    choosePlayerByChannel(channel: Channel) {
+        const rawUrl = channel?.url || '';
+        const isCatchup = String(channel?.epgParams || '').startsWith('catchup:');
+        const playbackUrl = this.getActiveSrc(channel);
+        const pref = this.playerSettings.player;
+        if (pref === VideoPlayer.Mpegts) {
+            this.chosenPlayer = 'mpegts';
+            return;
+        }
+        if (pref === VideoPlayer.Auto) {
+            // 回放：无论频道原始地址如何，统一使用 HTML5（回放模板通常为 m3u8 单播）
+            if (isCatchup) {
+                this.chosenPlayer = VideoPlayer.Html5Player;
+                return;
+            }
+            // 非回放：组播/TS 网关走 mpegts，其余走 HTML5
+            this.chosenPlayer = isMpegtsLikeUrl(rawUrl)
+                ? 'mpegts'
+                : VideoPlayer.Html5Player;
+            return;
+        }
+        this.chosenPlayer = pref as VideoPlayer;
+    }
+
+    getActiveSrc(channel: Channel): string {
+        return getPlaybackUrl(channel as any);
+    }
+
     ngOnDestroy() {
         if (this.isElectron) {
             this.dataService.removeAllListeners(PLAYLIST_PARSE_RESPONSE);
@@ -244,5 +285,17 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
 
     navigateHome() {
         this.router.navigate(['/']);
+    }
+
+    /** Mouse activity handlers to sync overlay with control bar */
+    onUiMouseMove() {
+        this.uiActive = true;
+        clearTimeout(this.uiTimer);
+        this.uiTimer = setTimeout(() => (this.uiActive = false), this.uiIdleMs);
+    }
+
+    onUiMouseLeave() {
+        clearTimeout(this.uiTimer);
+        this.uiActive = false;
     }
 }

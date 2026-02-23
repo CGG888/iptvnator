@@ -18,6 +18,17 @@ export class EpgListItemComponent {
     /** Aviability of the timeshift function until date */
     @Input() timeshiftUntil: string;
 
+    /** Currently active/playing program */
+    @Input() activeProgram?: EpgProgram;
+
+    isActiveProgram(): boolean {
+        if (!this.activeProgram || !this.item) return false;
+        return (
+            this.activeProgram.start === this.item.start &&
+            this.activeProgram.stop === this.item.stop
+        );
+    }
+
     /**
      * Creates an instance of EpgListItemComponent
      * @param dialog angular material dialog

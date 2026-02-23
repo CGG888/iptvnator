@@ -26,6 +26,25 @@
     <ng-container *ngIf="isEpgAvailable$ | async">
         <button
             mat-icon-button
+            [matMenuTriggerFor]="sourceMenu"
+            [matTooltip]="'TOP_MENU.SWITCH_SOURCE' | translate"
+            *ngIf="getAlternativeSources().length > 1"
+        >
+            <mat-icon>swap_horiz</mat-icon>
+        </button>
+        <mat-menu #sourceMenu="matMenu">
+            <button
+                mat-menu-item
+                *ngFor="let src of getAlternativeSources()"
+                (click)="switchSource(src)"
+            >
+                <mat-icon *ngIf="src.url === activeChannel?.url">radio_button_checked</mat-icon>
+                <mat-icon *ngIf="src.url !== activeChannel?.url">radio_button_unchecked</mat-icon>
+                <span>{{ sourceLabel(src) }}</span>
+            </button>
+        </mat-menu>
+        <button
+            mat-icon-button
             (click)="multiEpgClicked.emit()"
             [matTooltip]="'TOP_MENU.OPEN_MULTI_EPG' | translate"
         >
