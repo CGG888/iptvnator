@@ -21,7 +21,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
 
       - name: Detect version change
         id: diff
@@ -61,23 +61,25 @@ jobs:
       - name: Install Node.js, NPM and Yarn
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
 
       - name: Install Snapcraft
         uses: samuelmeuli/action-snapcraft@v3
         # Only install Snapcraft on Ubuntu
         if: startsWith(matrix.os, 'ubuntu')
-        with:
-          # Log in to Snap Store
-          snapcraft_token: ${{ secrets.SNAPCRAFT_TOKEN }}
       
       - name: Package Linux
         if: startsWith(matrix.os, 'ubuntu')
         run: |
           npm ci
           npm run build
-          npx electron-builder --linux snap --armv7l --publish always
-          npx electron-builder --linux snap --x64 --publish always
+          PUB="never"
+          if [ -n "${SNAPCRAFT_STORE_CREDENTIALS}" ]; then
+            PUB="always"
+          fi
+          echo "Snap publish mode: $PUB"
+          npx electron-builder --linux snap --armv7l --publish "$PUB"
+          npx electron-builder --linux snap --x64 --publish "$PUB"
           npx electron-builder --linux deb rpm --x64 --publish always
           npx electron-builder --linux deb --arm64 --publish always
           npx electron-builder --linux deb --armv7l --publish always
