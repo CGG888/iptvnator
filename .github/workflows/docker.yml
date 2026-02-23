@@ -18,10 +18,11 @@ on:
         default: 'linux/amd64,linux/arm64'
         type: string
   release:
-    types: [published]
+    types: [published, prereleased]
   push:
     tags:
       - 'v*'
+      - '*.*.*'
 
 permissions:
   contents: read
@@ -57,10 +58,8 @@ jobs:
         run: |
           OWNER="${{ github.repository_owner }}"
           OWNER_LC="${OWNER,,}"
-          # GHCR repository
           GHCR_REPO="ghcr.io/${OWNER_LC}/iptvnator"
 
-          # Optional Docker Hub repository when credentials are present
           DH_USER="${{ secrets.DOCKERHUB_USERNAME }}"
           DH_TOKEN="${{ secrets.DOCKERHUB_TOKEN }}"
           HAS_DH="false"
@@ -92,9 +91,7 @@ jobs:
           fi
           {
             echo "tags<<EOF"
-            # Always push to GHCR
             echo "${GHCR_REPO}:${V}"
-            # Optionally add Docker Hub tags
             if [ "$HAS_DH" = "true" ]; then
               echo "${DH_REPO}:${V}"
             fi
