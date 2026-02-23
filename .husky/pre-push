@@ -3,5 +3,5 @@
 
 [ -n "$CI" ] && exit 0
 
-npm run lint
+node node_modules/eslint/bin/eslint.js "src/**/*.ts" "src/**/*.html"
 npm test
