@@ -236,8 +236,35 @@
                 <p>{{ 'SETTINGS.VERSION_DESCRIPTION' | translate }}</p>
             </div>
             <div class="column">
-                {{ version }} <br />
-                {{ updateMessage }}
+                <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
+                    <mat-form-field appearance="outline" style="width: 220px;">
+                        <mat-label>当前版本号</mat-label>
+                        <input matInput [value]="version" readonly />
+                        <span matSuffix *ngIf="isUpdateAvailable" style="color: #f44336; font-size: 18px; line-height: 18px; margin-left: 6px;">●</span>
+                    </mat-form-field>
+                    <mat-form-field appearance="outline" style="width: 220px;">
+                        <mat-label>最新版本号</mat-label>
+                        <input matInput [value]="latestVersion || '—'" readonly />
+                    </mat-form-field>
+                    <div style="width: 220px; font-size: 12px; opacity: 0.8; text-align: right;">
+                        {{ updateMessage }}
+                    </div>
+                    <div *ngIf="isElectron" style="width: 220px;">
+                        <mat-form-field appearance="outline" style="width: 220px;">
+                            <mat-label>更新源</mat-label>
+                            <mat-select formControlName="updateSource">
+                                <mat-option value="auto">自动选择（推荐）</mat-option>
+                                <mat-option value="github">GitHub 官方</mat-option>
+                                <mat-option value="cdn">第三方 CDN</mat-option>
+                            </mat-select>
+                        </mat-form-field>
+                        <div style="margin-top: 8px; text-align: right;">
+                            <button mat-flat-button color="accent" type="button" (click)="checkForUpdates()">
+                                更新
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
         <mat-divider></mat-divider>

@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, NgZone } from '@angular/core';
 import {
     FormArray,
     FormBuilder,
@@ -13,6 +13,7 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
+import { MatDialogModule } from '@angular/material/dialog';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -40,6 +41,14 @@ import { SettingsService } from './../services/settings.service';
 import { Language } from './language.enum';
 import { Settings, VideoPlayer } from './settings.interface';
 import { Theme } from './theme.enum';
+import {
+    APP_UPDATE_CHECK,
+    APP_UPDATE_DONE,
+    APP_UPDATE_PROGRESS,
+    APP_UPDATE_INSTALL,
+} from '../../../shared/ipc-commands';
+import { MatDialog } from '@angular/material/dialog';
+import { UpdateProgressDialogComponent } from './update-progress-dialog.component';
 
 @Component({
     templateUrl: './settings.component.html',
@@ -50,6 +59,7 @@ import { Theme } from './theme.enum';
         FormsModule,
         HeaderComponent,
         MatButtonModule,
+        MatDialogModule,
         MatCheckboxModule,
         MatDividerModule,
         MatIconModule,
@@ -105,6 +115,12 @@ export class SettingsComponent implements OnInit {
     /** Update message to show */
     updateMessage: string;
 
+    /** Update availability red-dot flag */
+    isUpdateAvailable = false;
+
+    /** Latest release version (库版本) */
+    latestVersion = '';
+
     /** EPG availability flag */
     epgAvailable$ = this.store.select(selectIsEpgAvailable);
 
@@ -113,7 +129,7 @@ export class SettingsComponent implements OnInit {
 
     /** Settings form object */
     settingsForm = this.formBuilder.group({
-        player: [VideoPlayer.VideoJs],
+        player: [VideoPlayer.Auto],
         ...(this.isElectron ? { epgUrl: new FormArray([]) } : {}),
         language: Language.ENGLISH,
         showCaptions: false,
@@ -121,7 +137,8 @@ export class SettingsComponent implements OnInit {
         mpvPlayerPath: '',
         vlcPlayerPath: '',
         remoteControl: false,
-        remoteControlPort: 3000
+        remoteControlPort: 3000,
+        updateSource: 'auto'
     });
 
     /** Form array with epg sources */
@@ -136,12 +153,14 @@ export class SettingsComponent implements OnInit {
         private electronService: DataService,
         private epgService: EpgService,
         private formBuilder: FormBuilder,
+        private matDialog: MatDialog,
         private playlistsService: PlaylistsService,
         private router: Router,
         private settingsService: SettingsService,
         private snackBar: MatSnackBar,
         private store: Store,
-        private translate: TranslateService
+        private translate: TranslateService,
+        private zone: NgZone
     ) {}
 
     /**
@@ -151,6 +170,7 @@ export class SettingsComponent implements OnInit {
     ngOnInit(): void {
         this.setSettings();
         this.checkAppVersion();
+        if (this.isElectron) this.setUpdaterListeners();
     }
 
     /**
@@ -165,7 +185,7 @@ export class SettingsComponent implements OnInit {
                         this.settingsForm.setValue({
                             player: settings.player
                                 ? settings.player
-                                : VideoPlayer.VideoJs,
+                                : VideoPlayer.Auto,
                             ...(this.isElectron ? { epgUrl: [] } : {}),
                             language: settings.language ?? Language.ENGLISH,
                             showCaptions: settings.showCaptions ?? false,
@@ -173,7 +193,8 @@ export class SettingsComponent implements OnInit {
                             mpvPlayerPath: settings.mpvPlayerPath ?? '',
                             vlcPlayerPath: settings.vlcPlayerPath ?? '',
                             remoteControl: settings.remoteControl ?? false,
-                            remoteControlPort: settings.remoteControlPort ?? 3000
+                            remoteControlPort: settings.remoteControlPort ?? 3000,
+                            updateSource: (settings as any).updateSource ?? 'auto'
                         });
                     } catch (error) {
                         throw new Error(error);
@@ -221,15 +242,18 @@ export class SettingsComponent implements OnInit {
      * @param currentVersion current version of the application
      */
     showVersionInformation(currentVersion: string): void {
+        this.latestVersion = currentVersion;
         const isOutdated = this.isCurrentVersionOutdated(currentVersion);
 
         if (isOutdated) {
+            this.isUpdateAvailable = true;
             this.updateMessage = `${
                 this.translate.instant(
                     'SETTINGS.NEW_VERSION_AVAILABLE'
                 ) as string
             }: ${currentVersion}`;
         } else {
+            this.isUpdateAvailable = false;
             this.updateMessage = this.translate.instant(
                 'SETTINGS.LATEST_VERSION'
             );
@@ -245,6 +269,80 @@ export class SettingsComponent implements OnInit {
     isCurrentVersionOutdated(latestVersion: string): boolean {
         this.version = this.electronService.getAppVersion();
         return semver.lt(this.version, latestVersion);
+    }
+
+    // ===== Updater integration =====
+    updatePhase = '';
+    updateProgress = 0;
+    updateUrl = '';
+    updateDialogRef: any;
+
+    setUpdaterListeners() {
+        this.electronService.removeAllListeners(APP_UPDATE_PROGRESS);
+        this.electronService.removeAllListeners(APP_UPDATE_DONE);
+        this.electronService.listenOn(
+            APP_UPDATE_PROGRESS,
+            (_event, payload: any) => {
+                this.zone.run(() => {
+                    this.updatePhase = payload?.phase ?? '';
+                    if (payload?.progress !== undefined) {
+                        this.updateProgress = payload.progress;
+                    }
+                    if (payload?.url) this.updateUrl = payload.url;
+                    const comp =
+                        this.updateDialogRef &&
+                        this.updateDialogRef.componentInstance;
+                    if (comp && typeof comp.update === 'function') {
+                        comp.update(payload);
+                    }
+                });
+            }
+        );
+        this.electronService.listenOn(
+            APP_UPDATE_DONE,
+            (_event, payload: any) => {
+                this.zone.run(() => {
+                    this.updatePhase = 'done';
+                    this.updateProgress = 100;
+                    const comp =
+                        this.updateDialogRef &&
+                        this.updateDialogRef.componentInstance;
+                    if (comp && typeof comp.markDone === 'function') {
+                        comp.markDone(payload?.file);
+                    }
+                    if (this.updateDialogRef) {
+                        this.updateDialogRef
+                            .afterClosed()
+                            .pipe(take(1))
+                            .subscribe((res) => {
+                                if (res?.action === 'install' && payload?.file) {
+                                    this.electronService.sendIpcEvent(
+                                        APP_UPDATE_INSTALL,
+                                        { file: payload.file }
+                                    );
+                                }
+                                this.updateDialogRef = null;
+                            });
+                    }
+                });
+            }
+        );
+    }
+
+    checkForUpdates() {
+        const mode = this.settingsForm.value['updateSource'] || 'auto';
+        this.updateDialogRef = this.matDialog.open(
+            UpdateProgressDialogComponent,
+            { disableClose: true, width: '520px' }
+        );
+        this.updateDialogRef
+            .afterClosed()
+            .pipe(take(1))
+            .subscribe(() => (this.updateDialogRef = null));
+        this.electronService.sendIpcEvent(APP_UPDATE_CHECK, {
+            mode,
+            latest: this.latestVersion,
+        });
     }
 
     /**

@@ -5,7 +5,10 @@ import { catchError, map, Observable } from 'rxjs';
 import { STORE_KEY } from '../shared/enums/store-keys.enum';
 import { Theme } from './../settings/theme.enum';
 
-/** Url of the package.json file in the app repository, required to get the version of the released app */
+/** GitHub API endpoint for latest release */
+const RELEASES_API_URL =
+    'https://api.github.com/repos/CGG888/iptvnator/releases/latest';
+/** Fallback url of package.json in repo (in case API is blocked) */
 const PACKAGE_JSON_URL =
     'https://raw.githubusercontent.com/CGG888/iptvnator/electron/package.json';
 
@@ -59,15 +62,22 @@ export class SettingsService {
     }
 
     /**
-     * Returns the version of the released app
+     * Returns the latest released app version ("库版本")
+     * Primary: GitHub Releases API; Fallback: package.json in repo
      */
     getAppVersion() {
-        return this.http.get<{ version: string }>(PACKAGE_JSON_URL).pipe(
-            map((response) => response.version),
-            catchError((err) => {
-                console.error(err);
-                throw new Error(err);
-            })
+        return this.http.get<any>(RELEASES_API_URL, {
+            headers: { Accept: 'application/vnd.github+json' },
+        }).pipe(
+            map((response) => {
+                const v = response?.tag_name || response?.name || '';
+                return String(v).replace(/^v/i, '');
+            }),
+            catchError(() =>
+                this.http.get<{ version: string }>(PACKAGE_JSON_URL).pipe(
+                    map((response) => response.version)
+                )
+            )
         );
     }
 }

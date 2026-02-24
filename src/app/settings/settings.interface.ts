@@ -27,4 +27,5 @@ export interface Settings {
     vlcPlayerPath: string;
     remoteControl: boolean;
     remoteControlPort: number;
+    updateSource?: 'auto' | 'github' | 'cdn';
 }

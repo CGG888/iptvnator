@@ -224,7 +224,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         this.storage.get(STORE_KEY.Settings).subscribe((settings: Settings) => {
             if (settings && Object.keys(settings).length > 0) {
                 this.playerSettings = {
-                    player: settings.player || VideoPlayer.VideoJs,
+                    player: settings.player || VideoPlayer.Auto,
                     showCaptions: settings.showCaptions || false,
                 };
             }

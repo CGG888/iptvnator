@@ -63,3 +63,8 @@ package-lock.json
 # System Files
 .DS_Store
 Thumbs.db
+
+#自定义
+错误.md
+localhost-*.log
+commitlint.config.js

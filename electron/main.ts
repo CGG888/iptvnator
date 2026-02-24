@@ -2,6 +2,7 @@
 import { app, BrowserWindow, Menu } from 'electron';
 import * as path from 'path';
 import * as url from 'url';
+import * as http from 'http';
 import { Api } from './api';
 import { AppMenu } from './menu';
 
@@ -13,6 +14,8 @@ const {
 const contextMenu = require('electron-context-menu');
 const Store = require('electron-store');
 const store = new Store();
+
+process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = 'true';
 
 const WINDOW_BOUNDS = 'WINDOW_BOUNDS';
 
@@ -31,6 +34,7 @@ function createWindow(): BrowserWindow {
     win = new BrowserWindow({
         width: 1000,
         height: 800,
+        show: false,
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             nodeIntegration: true,
@@ -38,6 +42,7 @@ function createWindow(): BrowserWindow {
             contextIsolation: false,
             webSecurity: false,
         },
+        backgroundColor: '#111111',
         resizable: true,
         darkTheme: true,
         icon: path.join(__dirname, '../dist/assets/icons/icon.png'),
@@ -52,9 +57,62 @@ function createWindow(): BrowserWindow {
 
     require('@electron/remote/main').enable(win.webContents);
 
+    const showWhenReady = () => {
+        if (!win) return;
+        win.show();
+        try {
+            win.webContents.openDevTools({ mode: 'detach' });
+        } catch {}
+    };
+
     if (serve) {
-        win.on('ready-to-show', () => win?.webContents.openDevTools());
-        win.loadURL('http://localhost:4200');
+        const targets = ['http://127.0.0.1:4200', 'http://localhost:4200'];
+        const tryLoad = (index = 0) => {
+            const target = targets[index % targets.length];
+            const req = http.get(target, (res) => {
+                if (res.statusCode && res.statusCode >= 200 && res.statusCode < 500) {
+                    win?.loadURL(target).then(showWhenReady).catch(() => {
+                        setTimeout(() => tryLoad(index + 1), 700);
+                    });
+                } else {
+                    setTimeout(() => tryLoad(index + 1), 700);
+                }
+                res.resume();
+            });
+            req.on('error', () => setTimeout(() => tryLoad(index + 1), 700));
+            req.setTimeout(2000, () => {
+                req.destroy();
+                setTimeout(() => tryLoad(index + 1), 700);
+            });
+        };
+        tryLoad();
+
+        // Dev heartbeat: if dev-server drops after initial load, auto-retry
+        let hbFails = 0;
+        const hb = setInterval(() => {
+            if (!win) return;
+            const current = win.webContents.getURL();
+            if (!current || current === 'about:blank') return;
+            if (!current.includes('localhost:4200') && !current.includes('127.0.0.1:4200')) return;
+            const pingUrl = current.startsWith('http://127.0.0.1') ? 'http://127.0.0.1:4200/favicon.ico' : 'http://localhost:4200/favicon.ico';
+            const req = http.get(pingUrl, (res) => {
+                hbFails = 0;
+                res.resume();
+            });
+            req.on('error', () => {
+                hbFails += 1;
+                if (hbFails >= 2) {
+                    const target = current.includes('127.0.0.1') ? 'http://127.0.0.1:4200' : 'http://localhost:4200';
+                    win?.loadURL(target).catch(() => void 0);
+                }
+            });
+            req.setTimeout(800, () => {
+                req.destroy();
+                hbFails += 1;
+            });
+        }, 2000);
+
+        win.on('closed', () => clearInterval(hb));
     } else {
         win.loadURL(
             url.format({
@@ -62,8 +120,36 @@ function createWindow(): BrowserWindow {
                 protocol: 'file:',
                 slashes: true,
             })
-        );
+        ).then(showWhenReady);
     }
+
+    win.webContents.on('did-fail-load', () => {
+        if (!serve) return;
+        setTimeout(() => {
+            try {
+                const current = win?.webContents.getURL();
+                if (!current || current === 'about:blank') {
+                    win?.reload();
+                }
+            } catch {}
+        }, 1000);
+    });
+
+    win.webContents.on('dom-ready', () => {
+        try {
+            const script = `
+              (function(){
+                var t = setInterval(function(){
+                  document.querySelectorAll('.cet-container[aria-hidden="true"]').forEach(function(el){
+                    el.removeAttribute('aria-hidden');
+                  });
+                }, 300);
+                setTimeout(function(){ clearInterval(t); }, 5000);
+              })();
+            `;
+            win?.webContents.executeJavaScript(script);
+        } catch {}
+    });
 
     win.on('close', () => {
         if (win) store.set(WINDOW_BOUNDS, win.getNormalBounds());
