@@ -66,8 +66,10 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
 
     /** Selected video player options */
     playerSettings: Partial<Settings> = {
-        player: VideoPlayer.VideoJs,
+        player: VideoPlayer.Auto,
         showCaptions: false,
+        showStreamInfoOverlay: true,
+        playbackProfile: 'balanced',
     };
     chosenPlayer: VideoPlayer | 'mpegts' = VideoPlayer.VideoJs;
 
@@ -226,6 +228,11 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
                 this.playerSettings = {
                     player: settings.player || VideoPlayer.Auto,
                     showCaptions: settings.showCaptions || false,
+                    showStreamInfoOverlay:
+                        typeof settings.showStreamInfoOverlay === 'boolean'
+                            ? settings.showStreamInfoOverlay
+                            : true,
+                    playbackProfile: settings.playbackProfile || 'balanced',
                 };
             }
         });

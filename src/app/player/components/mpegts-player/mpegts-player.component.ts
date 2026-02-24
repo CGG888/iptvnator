@@ -22,6 +22,7 @@ import mpegts from 'mpegts.js';
 })
 export class MpegtsPlayerComponent implements OnChanges, OnDestroy {
     @Input() channel: Channel;
+    @Input() tuning: 'low' | 'balanced' | 'robust' = 'balanced';
     @ViewChild('videoRef', { static: true })
     videoRef: ElementRef<HTMLVideoElement>;
 
@@ -30,6 +31,7 @@ export class MpegtsPlayerComponent implements OnChanges, OnDestroy {
     private audioSet = false;
     private probeTimer: any;
     private probeRemaining = 6;
+    private setupTimer: any;
     @Output() mediaInfo = new EventEmitter<{
         width?: number;
         height?: number;
@@ -59,105 +61,161 @@ export class MpegtsPlayerComponent implements OnChanges, OnDestroy {
             this.probeTimer = null;
         }
         const url = getPlaybackUrl(channel as any);
-        if (mpegts && mpegts.isSupported()) {
-            if (this.player) {
-                try {
-                    this.player.unload();
-                    this.player.detachMediaElement();
-                    this.player.destroy();
-                } catch {}
-            }
-            this.player = mpegts.createPlayer({ type: 'mpegts', url });
-            this.player.attachMediaElement(this.videoRef.nativeElement);
-            const guess = this.guessFromChannel(channel);
-            // 先显示“临时猜测”，但不置位 codecSet/audioSet，让后续真实值覆盖
-            if (guess.videoCodec || typeof guess.audioChannels === 'number') this.mediaInfo.emit(guess);
+        if (this.player) {
             try {
-                this.player.on((mpegts as any).Events.MEDIA_INFO, (mi: any) => {
-                    const fps =
-                        mi?.fps ??
-                        mi?.video?.fps ??
-                        mi?.framerate ??
-                        undefined;
-                    const width =
-                        mi?.width ?? mi?.video?.width ?? this.videoRef?.nativeElement?.videoWidth;
-                    const height =
-                        mi?.height ?? mi?.video?.height ?? this.videoRef?.nativeElement?.videoHeight;
-                    const audioChannels =
-                        mi?.audioChannelCount ??
-                        mi?.audio?.channelCount ??
-                        undefined;
-                    const videoCodec =
-                        this.normalizeCodec(
-                            mi?.videoCodec ?? mi?.codec ?? mi?.video?.codec
-                        ) || undefined;
-                    const payload: any = {
-                        width,
-                        height,
-                        fps: fps ? Number(fps) : undefined,
-                    };
-                    if (typeof audioChannels === 'number') {
-                        payload.audioChannels = audioChannels;
-                        this.audioSet = true;
+                this.player.unload();
+                this.player.detachMediaElement();
+                this.player.destroy();
+            } catch {}
+        }
+        if (this.setupTimer) {
+            clearTimeout(this.setupTimer);
+            this.setupTimer = null;
+        }
+        this.setupTimer = setTimeout(() => {
+            if (mpegts && mpegts.isSupported()) {
+                const cfgMap: any = {
+                    low: {
+                        isLive: true,
+                        enableStashBuffer: false,
+                        stashInitialSize: 131072,
+                        lazyLoad: false,
+                        deferLoadAfterSourceOpen: false,
+                        autoCleanupSourceBuffer: true,
+                        autoCleanupMaxBackwardDuration: 6,
+                        autoCleanupMinBackwardDuration: 2,
+                    },
+                    balanced: {
+                        isLive: true,
+                        enableStashBuffer: true,
+                        stashInitialSize: 393216,
+                        autoCleanupSourceBuffer: true,
+                        autoCleanupMaxBackwardDuration: 12,
+                        autoCleanupMinBackwardDuration: 4,
+                    },
+                    robust: {
+                        isLive: true,
+                        enableStashBuffer: true,
+                        stashInitialSize: 786432,
+                        autoCleanupSourceBuffer: true,
+                        autoCleanupMaxBackwardDuration: 20,
+                        autoCleanupMinBackwardDuration: 6,
+                    },
+                };
+                const isFcc = this.isFccChannel(channel);
+                let cfg = cfgMap[this.tuning] || cfgMap['balanced'];
+                if (isFcc) {
+                    if (this.tuning === 'low') {
+                        cfg = { ...cfg, stashInitialSize: 65536 };
+                    } else if (this.tuning === 'balanced') {
+                        cfg = { ...cfg, enableStashBuffer: false, stashInitialSize: 131072 };
                     }
-                    if (videoCodec) {
-                        payload.videoCodec = videoCodec;
-                        this.codecSet = true;
-                    }
-                    this.mediaInfo.emit(payload);
-                });
-                // 尝试从初始化片段中解析 MIME/Codec（部分 4K 组播只在此处可拿到）
-                this.player.on((mpegts as any).Events.INIT_SEGMENT, (seg: any) => {
-                    const pick = (s?: string) => {
-                        if (!s) return undefined;
-                        const m = String(s).match(/codecs="?([^";]+)"?/i);
-                        return m && m[1] ? m[1] : s;
-                    };
-                    const mime =
-                        (seg && (seg.mimetype || seg.mimeType || seg.mime)) ||
-                        (seg && seg.container) ||
-                        undefined;
-                    const raw = pick(mime) || seg?.codec || seg?.videoCodec;
-                    const v = this.normalizeCodec(raw);
-                    const lower = String(raw || '').toLowerCase();
-                    const payload: any = {};
-                    if (v) {
-                        payload.videoCodec = v;
-                        this.codecSet = true;
-                    }
-                    if (!this.audioSet) {
-                        // 粗略根据音频编解码推断声道
-                        if (/(ac-3|ec-3|eac3|ac3|dolby)/i.test(lower)) {
-                            payload.audioChannels = 6;
-                            this.audioSet = true;
-                        } else if (/mp4a|aac/.test(lower)) {
-                            payload.audioChannels = 2;
+                }
+                this.player = mpegts.createPlayer({ type: 'mpegts', url }, cfg);
+                this.player.attachMediaElement(this.videoRef.nativeElement);
+                const guess = this.guessFromChannel(channel);
+                if (guess.videoCodec || typeof guess.audioChannels === 'number') this.mediaInfo.emit(guess);
+                try {
+                    this.player.on((mpegts as any).Events.MEDIA_INFO, (mi: any) => {
+                        const fps =
+                            mi?.fps ??
+                            mi?.video?.fps ??
+                            mi?.framerate ??
+                            undefined;
+                        const width =
+                            mi?.width ?? mi?.video?.width ?? this.videoRef?.nativeElement?.videoWidth;
+                        const height =
+                            mi?.height ?? mi?.video?.height ?? this.videoRef?.nativeElement?.videoHeight;
+                        const audioChannels =
+                            mi?.audioChannelCount ??
+                            mi?.audio?.channelCount ??
+                            undefined;
+                        const videoCodec =
+                            this.normalizeCodec(
+                                mi?.videoCodec ?? mi?.codec ?? mi?.video?.codec
+                            ) || undefined;
+                        const payload: any = {
+                            width,
+                            height,
+                            fps: fps ? Number(fps) : undefined,
+                        };
+                        if (typeof audioChannels === 'number') {
+                            payload.audioChannels = audioChannels;
                             this.audioSet = true;
                         }
-                    }
-                    if (Object.keys(payload).length) this.mediaInfo.emit(payload);
-                });
-                this.player.on((mpegts as any).Events.STATISTICS_INFO, (_s: any) => {
-                    const vw = this.videoRef?.nativeElement?.videoWidth;
-                    const vh = this.videoRef?.nativeElement?.videoHeight;
-                    if (vw && vh) {
-                        this.mediaInfo.emit({ width: vw, height: vh });
-                        // 若识别到 4K 分辨率但仍无编码，按惯例回退 H.265
-                        if (!this.codecSet && (vh >= 2160 || vw >= 3840)) {
-                            this.mediaInfo.emit({ videoCodec: 'H.265' });
+                        if (videoCodec) {
+                            payload.videoCodec = videoCodec;
                             this.codecSet = true;
                         }
+                        this.mediaInfo.emit(payload);
+                    });
+                    this.player.on((mpegts as any).Events.INIT_SEGMENT, (seg: any) => {
+                        const pick = (s?: string) => {
+                            if (!s) return undefined;
+                            const m = String(s).match(/codecs="?([^";]+)"?/i);
+                            return m && m[1] ? m[1] : s;
+                        };
+                        const mime =
+                            (seg && (seg.mimetype || seg.mimeType || seg.mime)) ||
+                            (seg && seg.container) ||
+                            undefined;
+                        const raw = pick(mime) || seg?.codec || seg?.videoCodec;
+                        const v = this.normalizeCodec(raw);
+                        const lower = String(raw || '').toLowerCase();
+                        const payload: any = {};
+                        if (v) {
+                            payload.videoCodec = v;
+                            this.codecSet = true;
+                        }
+                        if (!this.audioSet) {
+                            if (/(ac-3|ec-3|eac3|ac3|dolby)/i.test(lower)) {
+                                payload.audioChannels = 6;
+                                this.audioSet = true;
+                            } else if (/mp4a|aac/.test(lower)) {
+                                payload.audioChannels = 2;
+                                this.audioSet = true;
+                            }
+                        }
+                        if (Object.keys(payload).length) this.mediaInfo.emit(payload);
+                    });
+                    this.player.on((mpegts as any).Events.STATISTICS_INFO, (_s: any) => {
+                        const vw = this.videoRef?.nativeElement?.videoWidth;
+                        const vh = this.videoRef?.nativeElement?.videoHeight;
+                        if (vw && vh) {
+                            this.mediaInfo.emit({ width: vw, height: vh });
+                            if (!this.codecSet && (vh >= 2160 || vw >= 3840)) {
+                                this.mediaInfo.emit({ videoCodec: 'H.265' });
+                                this.codecSet = true;
+                            }
+                        }
+                    });
+                } catch {}
+                if (typeof this.player.load === 'function') this.player.load();
+                try {
+                    const ret = this.player.play && this.player.play();
+                    if (ret && typeof ret.then === 'function') {
+                        ret.catch((e: any) => {
+                            const n = (e && e.name) || '';
+                            if (n === 'AbortError' || n === 'NotSupportedError') return;
+                        });
                     }
-                });
-            } catch {}
-            this.player.load();
-            this.player.play();
-            this.startProbingForUhd();
-        } else {
-            this.videoRef.nativeElement.src = url;
-            this.videoRef.nativeElement.play();
-            this.startProbingForUhd();
-        }
+                } catch {}
+                this.safePlay(this.videoRef?.nativeElement);
+                this.startProbingForUhd();
+            } else {
+                this.videoRef.nativeElement.src = url;
+                this.safePlay(this.videoRef.nativeElement);
+                this.startProbingForUhd();
+            }
+        }, 0);
+    }
+
+    private isFccChannel(c: Channel): boolean {
+        const u = String(c?.url || '').toLowerCase();
+        if (!u) return false;
+        if (u.includes('fcc=1') || u.includes('fastswitch') || u.includes('fastchannel')) return true;
+        const hint = String((c as any)?.http?.['x-fcc'] || '').toLowerCase();
+        return hint === '1' || hint === 'true' || hint === 'yes';
     }
 
     private normalizeCodec(str?: string): string | undefined {
@@ -170,6 +228,19 @@ export class MpegtsPlayerComponent implements OnChanges, OnDestroy {
         if (s.includes('vp09') || s.includes('vp9')) return 'VP9';
         if (s.includes('mp4v') || s.includes('mpeg4')) return 'MPEG-4';
         return s.toUpperCase();
+    }
+    
+    private safePlay(video?: HTMLVideoElement) {
+        if (!video) return;
+        try {
+            const p = video.play();
+            if (p && typeof p.catch === 'function') {
+                p.catch((e: any) => {
+                    const n = (e && e.name) || '';
+                    if (n === 'AbortError' || n === 'NotSupportedError') return;
+                });
+            }
+        } catch {}
     }
     
     private guessFromChannel(channel: Channel): { videoCodec?: string; audioChannels?: number } {

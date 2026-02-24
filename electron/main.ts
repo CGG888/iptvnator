@@ -61,7 +61,11 @@ function createWindow(): BrowserWindow {
         if (!win) return;
         win.show();
         try {
-            win.webContents.openDevTools({ mode: 'detach' });
+            const shouldOpenDevTools =
+                serve && process.env.e2e !== 'true' && process.env.OPEN_DEVTOOLS !== 'false';
+            if (shouldOpenDevTools) {
+                win.webContents.openDevTools({ mode: 'detach' });
+            }
         } catch {}
     };
 

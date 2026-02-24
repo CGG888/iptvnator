@@ -28,4 +28,6 @@ export interface Settings {
     remoteControl: boolean;
     remoteControlPort: number;
     updateSource?: 'auto' | 'github' | 'cdn';
+    showStreamInfoOverlay?: boolean;
+    playbackProfile?: 'low' | 'balanced' | 'robust';
 }

@@ -53,6 +53,7 @@ export class HtmlVideoPlayerComponent implements OnChanges, OnDestroy {
 
     /** Captions/subtitles indicator */
     @Input() showCaptions!: boolean;
+    @Input() tuning: 'low' | 'balanced' | 'robust' = 'balanced';
 
     /**
      * Listen for component input changes
@@ -86,9 +87,27 @@ export class HtmlVideoPlayerComponent implements OnChanges, OnDestroy {
                 Hls.isSupported()
             ) {
                 console.log('... switching channel to ', channel.name, url);
-                this.hls = new Hls({
-                    lowLatencyMode: false,
-                    backBufferLength: 60,
+                const profiles: any = {
+                    low: {
+                        lowLatencyMode: true,
+                        backBufferLength: 30,
+                        maxBufferLength: 8,
+                        maxMaxBufferLength: 16,
+                    },
+                    balanced: {
+                        lowLatencyMode: false,
+                        backBufferLength: 60,
+                        maxBufferLength: 16,
+                        maxMaxBufferLength: 30,
+                    },
+                    robust: {
+                        lowLatencyMode: false,
+                        backBufferLength: 120,
+                        maxBufferLength: 30,
+                        maxMaxBufferLength: 60,
+                    },
+                };
+                const baseCfg: any = {
                     enableWorker: true,
                     manifestLoadingTimeOut: 8000,
                     manifestLoadingMaxRetry: 2,
@@ -109,7 +128,9 @@ export class HtmlVideoPlayerComponent implements OnChanges, OnDestroy {
                             return init;
                         }
                     },
-                } as any);
+                };
+                const tuningCfg = profiles[this.tuning] || profiles['balanced'];
+                this.hls = new Hls({ ...baseCfg, ...tuningCfg } as any);
                 this.hls.attachMedia(this.videoPlayer.nativeElement);
                 this.hls.on(Hls.Events.ERROR, (_e, data: any) => {
                     if (!data?.fatal) return;

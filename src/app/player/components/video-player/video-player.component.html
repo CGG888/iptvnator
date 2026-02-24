@@ -50,11 +50,13 @@
                     *ngIf="chosenPlayer === 'html5'"
                     [channel]="activeChannel"
                     [showCaptions]="playerSettings.showCaptions"
+                    [tuning]="playerSettings.playbackProfile || 'balanced'"
                     (mediaInfo)="onMediaInfo($event)"
                 />
                 <app-mpegts-player
                     *ngIf="chosenPlayer === 'mpegts'"
                     [channel]="activeChannel"
+                    [tuning]="playerSettings.playbackProfile || 'balanced'"
                     (mediaInfo)="onMediaInfo($event)"
                 />
                 <div
@@ -90,6 +92,7 @@
                 </div>
                 <!-- channel overlay -->
                 <app-info-overlay
+                    *ngIf="playerSettings.showStreamInfoOverlay !== false"
                     [channel]="activeChannel"
                     [epgProgram]="epgProgram$ | async"
                     [controlsActive]="uiActive"
