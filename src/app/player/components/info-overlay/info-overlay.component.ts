@@ -25,6 +25,7 @@ export class InfoOverlayComponent implements OnChanges {
               height?: number;
               fps?: number;
               audioChannels?: number;
+              videoCodec?: string;
           }
         | undefined;
 
@@ -130,6 +131,18 @@ export class InfoOverlayComponent implements OnChanges {
         if (n === 2) return '2.0';
         if (n === 6) return '5.1';
         return `${n}.0`;
+    }
+
+    codecLabel(): string {
+        if (this.runtimeMeta?.videoCodec) return this.runtimeMeta.videoCodec;
+        const c = this.channel;
+        if (!c) return '';
+        const sfx = getDollarSuffix(c.url).toLowerCase();
+        if (/hevc|h265|h\.265|hev1|hvc1/.test(sfx)) return 'H.265';
+        if (/h264|h\.264|avc1|avc/.test(sfx)) return 'H.264';
+        if (/av1|av01/.test(sfx)) return 'AV1';
+        if (/vp09|vp9/.test(sfx)) return 'VP9';
+        return '';
     }
 
     private getQualitySuffix(c: Channel): string {

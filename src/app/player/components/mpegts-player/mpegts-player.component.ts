@@ -31,6 +31,7 @@ export class MpegtsPlayerComponent implements OnChanges, OnDestroy {
         height?: number;
         fps?: number;
         audioChannels?: number;
+        videoCodec?: string;
     }>();
 
     constructor(private dataService: DataService) {}
@@ -72,11 +73,16 @@ export class MpegtsPlayerComponent implements OnChanges, OnDestroy {
                         mi?.audioChannelCount ??
                         mi?.audio?.channelCount ??
                         undefined;
+                    const videoCodec =
+                        this.normalizeCodec(
+                            mi?.videoCodec ?? mi?.codec ?? mi?.video?.codec
+                        ) || undefined;
                     this.mediaInfo.emit({
                         width,
                         height,
                         fps: fps ? Number(fps) : undefined,
                         audioChannels,
+                        videoCodec,
                     });
                 });
                 this.player.on((mpegts as any).Events.STATISTICS_INFO, (_s: any) => {
@@ -93,6 +99,18 @@ export class MpegtsPlayerComponent implements OnChanges, OnDestroy {
             this.videoRef.nativeElement.src = url;
             this.videoRef.nativeElement.play();
         }
+    }
+
+    private normalizeCodec(str?: string): string | undefined {
+        if (!str) return undefined;
+        const s = String(str).toLowerCase();
+        if (s.includes('av01')) return 'AV1';
+        if (s.includes('hev1') || s.includes('hvc1') || s.includes('h265') || s.includes('hevc'))
+            return 'H.265';
+        if (s.includes('avc1') || s.includes('h264') || s.includes('avc')) return 'H.264';
+        if (s.includes('vp09') || s.includes('vp9')) return 'VP9';
+        if (s.includes('mp4v') || s.includes('mpeg4')) return 'MPEG-4';
+        return s.toUpperCase();
     }
 
     ngOnDestroy(): void {

@@ -19,6 +19,15 @@ import { getDollarSuffix, isMpegtsLikeUrl } from '../../../../../../shared/playl
 })
 export class ToolbarComponent {
     @Input() activeChannel!: Channel;
+    @Input() runtimeMeta?:
+        | {
+              width?: number;
+              height?: number;
+              fps?: number;
+              audioChannels?: number;
+              videoCodec?: string;
+          }
+        | undefined;
     @Output() multiEpgClicked = new EventEmitter<void>();
     @Output() toggleLeftDrawerClicked = new EventEmitter<void>();
     @Output() toggleRightDrawerClicked = new EventEmitter<void>();
@@ -79,10 +88,38 @@ export class ToolbarComponent {
 
     sourceLabel(c: Channel): string {
         const type = isMpegtsLikeUrl(c.url) ? '组播' : '单播';
-        const suffix = this.getQualitySuffix(c);
-        const fps = this.getFpsSuffix(c);
-        const parts = [type, suffix, fps].filter(Boolean);
+        const codec =
+            c?.url === this.activeChannel?.url && this.runtimeMeta?.videoCodec
+                ? this.runtimeMeta.videoCodec
+                : this.getCodecSuffix(c);
+        const quality =
+            c?.url === this.activeChannel?.url &&
+            (this.runtimeMeta?.width || this.runtimeMeta?.height)
+                ? this.getQualityFromRuntime()
+                : this.getQualitySuffix(c);
+        const fps =
+            c?.url === this.activeChannel?.url && this.runtimeMeta?.fps
+                ? `${Math.round(this.runtimeMeta.fps)}fps`
+                : this.getFpsSuffix(c);
+        const parts = [type, codec, quality, fps].filter(Boolean);
         return parts.join('-');
+    }
+
+    private getQualityFromRuntime(): string {
+        const h = this.runtimeMeta?.height || 0;
+        const w = this.runtimeMeta?.width || 0;
+        if (h >= 2160 || w >= 3840) return 'UHD';
+        if (h >= 720 || w >= 1280) return 'HD';
+        return 'SD';
+    }
+
+    private getCodecSuffix(c: Channel): string {
+        const sfx = getDollarSuffix(c.url).toLowerCase();
+        if (/hevc|h265|h\.265|hev1|hvc1/.test(sfx)) return 'H.265';
+        if (/h264|h\.264|avc1|avc/.test(sfx)) return 'H.264';
+        if (/av1|av01/.test(sfx)) return 'AV1';
+        if (/vp09|vp9/.test(sfx)) return 'VP9';
+        return '';
     }
 
     getQualitySuffix(c: Channel): string {

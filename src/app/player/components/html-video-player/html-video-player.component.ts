@@ -33,7 +33,10 @@ export class HtmlVideoPlayerComponent implements OnChanges, OnDestroy {
         height?: number;
         fps?: number;
         audioChannels?: number;
+        videoCodec?: string;
     }>();
+    private fpsEstimated = false;
+    private fpsTimer: any;
 
     constructor(dataService: DataService) {
         this.dataService = dataService; // Inject the DataService
@@ -90,12 +93,37 @@ export class HtmlVideoPlayerComponent implements OnChanges, OnDestroy {
                         undefined;
                     const width = (l as any)?.width;
                     const height = (l as any)?.height;
-                    this.mediaInfo.emit({
-                        width,
-                        height,
-                        fps: fps ? Number(fps) : undefined,
-                        audioChannels: this.extractAudioChannels(),
-                    });
+                    const videoCodec =
+                        this.normalizeCodec(
+                            (l as any)?.videoCodec ||
+                                (l as any)?.codecs ||
+                                (l as any)?.attrs?.['CODECS']
+                        ) || undefined;
+                    const meta: any = {};
+                    if (width) meta.width = width;
+                    if (height) meta.height = height;
+                    if (fps) meta.fps = Number(fps);
+                    const ac = this.extractAudioChannels();
+                    if (typeof ac === 'number') meta.audioChannels = ac;
+                    if (videoCodec) meta.videoCodec = videoCodec;
+                    if (Object.keys(meta).length) this.mediaInfo.emit(meta);
+                });
+                this.hls.on(Hls.Events.FRAG_PARSING_INIT_SEGMENT, (_e, d: any) => {
+                    const v = d?.tracks?.video;
+                    const a = d?.tracks?.audio;
+                    const width = v?.width;
+                    const height = v?.height;
+                    const videoCodec = this.normalizeCodec(v?.codec);
+                    const audioChannels =
+                        a?.channels ||
+                        a?.metadata?.channelCount ||
+                        this.extractAudioChannels();
+                    const meta: any = {};
+                    if (width) meta.width = width;
+                    if (height) meta.height = height;
+                    if (typeof audioChannels === 'number') meta.audioChannels = audioChannels;
+                    if (videoCodec) meta.videoCodec = videoCodec;
+                    if (Object.keys(meta).length) this.mediaInfo.emit(meta);
                 });
                 this.hls.on(Hls.Events.LEVEL_SWITCHED, (_e, d: any) => {
                     const idx = d?.level ?? this.hls.currentLevel;
@@ -106,17 +134,26 @@ export class HtmlVideoPlayerComponent implements OnChanges, OnDestroy {
                         undefined;
                     const width = (l as any)?.width;
                     const height = (l as any)?.height;
-                    this.mediaInfo.emit({
-                        width,
-                        height,
-                        fps: fps ? Number(fps) : undefined,
-                        audioChannels: this.extractAudioChannels(),
-                    });
+                    const videoCodec =
+                        this.normalizeCodec(
+                            (l as any)?.videoCodec ||
+                                (l as any)?.codecs ||
+                                (l as any)?.attrs?.['CODECS']
+                        ) || undefined;
+                    const meta: any = {};
+                    if (width) meta.width = width;
+                    if (height) meta.height = height;
+                    if (fps) meta.fps = Number(fps);
+                    const ac = this.extractAudioChannels();
+                    if (typeof ac === 'number') meta.audioChannels = ac;
+                    if (videoCodec) meta.videoCodec = videoCodec;
+                    if (Object.keys(meta).length) this.mediaInfo.emit(meta);
                 });
                 this.hls.on(Hls.Events.AUDIO_TRACK_SWITCHED, () => {
-                    this.mediaInfo.emit({
-                        audioChannels: this.extractAudioChannels(),
-                    });
+                    const ac = this.extractAudioChannels();
+                    if (typeof ac === 'number') {
+                        this.mediaInfo.emit({ audioChannels: ac });
+                    }
                 });
                 this.hls.loadSource(url);
 
@@ -128,7 +165,7 @@ export class HtmlVideoPlayerComponent implements OnChanges, OnDestroy {
                     url,
                     'video/mp4'
                 );
-                this.videoPlayer.nativeElement.play();
+                this.handlePlayOperation();
             }
         }
     }
@@ -146,6 +183,18 @@ export class HtmlVideoPlayerComponent implements OnChanges, OnDestroy {
         }
         const n = parseInt(str, 10);
         return isNaN(n) ? undefined : n;
+    }
+
+    private normalizeCodec(str?: string): string | undefined {
+        if (!str) return undefined;
+        const s = String(str).toLowerCase();
+        if (s.includes('av01')) return 'AV1';
+        if (s.includes('hev1') || s.includes('hvc1') || s.includes('h265') || s.includes('hevc'))
+            return 'H.265';
+        if (s.includes('avc1') || s.includes('h264') || s.includes('avc')) return 'H.264';
+        if (s.includes('vp09') || s.includes('vp9')) return 'VP9';
+        if (s.includes('mp4v') || s.includes('mpeg4')) return 'MPEG-4';
+        return s.toUpperCase();
     }
 
     addSourceToVideo(element: HTMLVideoElement, url: string, type: string) {
@@ -181,15 +230,60 @@ export class HtmlVideoPlayerComponent implements OnChanges, OnDestroy {
                     if (!this.showCaptions) {
                         this.disableCaptions();
                     }
+                    this.startFpsSampling();
                 })
                 .catch(() => {});
         }
+    }
+
+    private startFpsSampling() {
+        if (this.fpsTimer) {
+            clearInterval(this.fpsTimer);
+            this.fpsTimer = null;
+        }
+        const video = this.videoPlayer?.nativeElement;
+        if (!video) return;
+        let lastFrames = this.getDecodedFrames(video);
+        let lastTs = performance.now();
+        this.fpsTimer = setInterval(() => {
+            const now = performance.now();
+            const frames = this.getDecodedFrames(video);
+            const dFrames = frames - lastFrames;
+            const dMs = now - lastTs;
+            if (dFrames > 0 && dMs > 200) {
+                const fps = (dFrames * 1000) / dMs;
+                if (isFinite(fps) && fps > 5 && fps < 120) {
+                    this.mediaInfo.emit({ fps: Math.round(fps) });
+                    this.fpsEstimated = true;
+                }
+            }
+            lastFrames = frames;
+            lastTs = now;
+        }, 1000);
+    }
+
+    private getDecodedFrames(video: HTMLVideoElement): number {
+        const anyV = video as any;
+        if (typeof video.getVideoPlaybackQuality === 'function') {
+            try {
+                const q = video.getVideoPlaybackQuality() as any;
+                if (q && typeof q.totalVideoFrames === 'number') return q.totalVideoFrames;
+            } catch {}
+        }
+        if (typeof anyV.webkitDecodedFrameCount === 'number') {
+            return anyV.webkitDecodedFrameCount;
+        }
+        return 0;
     }
 
     /**
      * Destroy hls instance on component destroy
      */
     ngOnDestroy(): void {
+        if (this.fpsTimer) {
+            clearInterval(this.fpsTimer);
+            this.fpsTimer = null;
+        }
         if (this.hls) {
             this.hls.destroy();
         }

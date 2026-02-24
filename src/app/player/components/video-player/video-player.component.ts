@@ -41,6 +41,7 @@ type RuntimeMeta = {
     height?: number;
     fps?: number;
     audioChannels?: number;
+    videoCodec?: string;
 };
 
 export const COMPONENT_OVERLAY_REF = new InjectionToken(
@@ -258,7 +259,18 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     }
 
     onMediaInfo(meta: RuntimeMeta) {
-        this.runtimeMeta = { ...this.runtimeMeta, ...meta };
+        const filtered: RuntimeMeta = {};
+        if (typeof meta.width === 'number' && meta.width > 0)
+            filtered.width = meta.width;
+        if (typeof meta.height === 'number' && meta.height > 0)
+            filtered.height = meta.height;
+        if (typeof meta.fps === 'number' && meta.fps > 0)
+            filtered.fps = Math.round(meta.fps);
+        if (typeof meta.audioChannels === 'number' && meta.audioChannels > 0)
+            filtered.audioChannels = meta.audioChannels;
+        if (typeof meta.videoCodec === 'string' && meta.videoCodec.trim())
+            filtered.videoCodec = meta.videoCodec.trim();
+        this.runtimeMeta = { ...this.runtimeMeta, ...filtered };
     }
 
     ngOnDestroy() {

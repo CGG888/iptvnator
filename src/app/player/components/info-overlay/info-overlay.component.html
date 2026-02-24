@@ -17,6 +17,7 @@
                 {{ epgProgram?.title[0]?.value ? (epgProgram?.title[0]?.value + ' | ' + channel.name) : channel.name }}
             </div>
             <span class="badge" [ngClass]="isLive ? 'live' : (isReplay ? 'rec' : '')">{{ netTypeLabel() }}</span>
+            <span *ngIf="codecLabel()" class="badge" [ngClass]="isLive ? 'live' : (isReplay ? 'rec' : '')">{{ codecLabel() }}</span>
             <span class="badge" [ngClass]="isLive ? 'live' : (isReplay ? 'rec' : '')">{{ qualityLabel() }}</span>
             <span *ngIf="fpsLabel()" class="badge" [ngClass]="isLive ? 'live' : (isReplay ? 'rec' : '')">{{ fpsLabel() }}</span>
             <span *ngIf="audioLabel()" class="badge" [ngClass]="isLive ? 'live' : (isReplay ? 'rec' : '')">{{ audioLabel() }}</span>

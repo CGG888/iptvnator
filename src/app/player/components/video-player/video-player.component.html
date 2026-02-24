@@ -17,6 +17,7 @@
                 (toggleRightDrawerClicked)="drawerRight.toggle()"
                 (multiEpgClicked)="openMultiEpgView()"
                 [activeChannel]="activeChannel"
+                [runtimeMeta]="runtimeMeta"
             />
 
             <app-audio-player
@@ -41,6 +42,7 @@
                             },
                         ],
                     }"
+                    (mediaInfo)="onMediaInfo($event)"
                     [class.hide-captions]="!playerSettings.showCaptions"
                 ></app-vjs-player>
 
