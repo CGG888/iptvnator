@@ -181,13 +181,10 @@ export class Api {
             )
             .on(
                 CHANNEL_SET_USER_AGENT,
-                (_event, args: { userAgent: string; referer?: string }) => {
-                    if (args.userAgent || args.referer !== undefined) {
-                        this.setUserAgent(
-                            args.userAgent || 'localhost',
-                            args.referer || 'localhost'
-                        );
-                    } 
+                (_event, args: { userAgent?: string; referer?: string }) => {
+                    if (args && (args.userAgent !== undefined || args.referer !== undefined)) {
+                        this.setUserAgent(args.userAgent, args.referer);
+                    }
                 }
             )
             .on(IS_PLAYLISTS_MIGRATION_POSSIBLE, (event) => {
@@ -412,27 +409,28 @@ export class Api {
      * @param userAgent user agent to use
      * @param referer referer to use
      */
-    setUserAgent(userAgent: string, referer?: string): void {
-        if (userAgent === undefined || userAgent === null || userAgent === '') {
-            userAgent = this.defaultUserAgent;
-        }
-
-        // Remove trailing slash from referer if it exists
-        let originURL: string;
-        if (referer?.endsWith('/')) {
-        originURL= referer.slice(0, -1);
-        }
-
-        session.defaultSession.webRequest.onBeforeSendHeaders(
-            (details, callback) => {
-                details.requestHeaders['User-Agent'] = userAgent;
-                // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-                details.requestHeaders['Referer'] = referer as string;
-                details.requestHeaders['Origin'] = originURL as string;
-                callback({ requestHeaders: details.requestHeaders });
+    setUserAgent(userAgent?: string, referer?: string): void {
+        const ua = userAgent && userAgent.trim().length ? userAgent : this.defaultUserAgent;
+        let origin: string | undefined;
+        if (referer && referer.trim().length) {
+            try {
+                origin = new URL(referer).origin;
+            } catch {
+                origin = undefined;
             }
-        );
-        console.log(`Success: Set "${userAgent}" as user agent header`);
+        }
+        session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
+            details.requestHeaders['User-Agent'] = ua;
+            if (referer && referer.trim().length) {
+                details.requestHeaders['Referer'] = referer;
+                if (origin) details.requestHeaders['Origin'] = origin;
+            } else {
+                delete details.requestHeaders['Referer'];
+                delete details.requestHeaders['Origin'];
+            }
+            callback({ requestHeaders: details.requestHeaders });
+        });
+        console.log(`Success: Set "${ua}" as user agent header${referer ? `, referer=${referer}` : ''}`);
     }
 
     /**

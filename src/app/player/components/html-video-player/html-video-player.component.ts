@@ -11,7 +11,7 @@ import {
 } from '@angular/core';
 import Hls from 'hls.js';
 import { Channel } from '../../../../../shared/channel.interface';
-import { CHANNEL_SET_USER_AGENT } from '../../../../../shared/ipc-commands';
+import { CHANNEL_SET_USER_AGENT, OPEN_MPV_PLAYER } from '../../../../../shared/ipc-commands';
 import { getExtensionFromUrl, getPlaybackUrl, stripAfterDollar } from '../../../../../shared/playlist.utils';
 import { DataService } from '../../../services/data.service';
 
@@ -37,6 +37,8 @@ export class HtmlVideoPlayerComponent implements OnChanges, OnDestroy {
     }>();
     private fpsEstimated = false;
     private fpsTimer: any;
+    private hlsRetry = 0;
+    private readonly maxRetry = 2;
 
     constructor(dataService: DataService) {
         this.dataService = dataService; // Inject the DataService
@@ -69,6 +71,7 @@ export class HtmlVideoPlayerComponent implements OnChanges, OnDestroy {
     playChannel(channel: Channel): void {
         if (this.hls) this.hls.destroy();
         if (channel.url) {
+            this.hlsRetry = 0;
             const url = getPlaybackUrl(channel as any);
             const extension = getExtensionFromUrl(stripAfterDollar(channel.url));
             this.dataService.sendIpcEvent(CHANNEL_SET_USER_AGENT, {
@@ -83,8 +86,69 @@ export class HtmlVideoPlayerComponent implements OnChanges, OnDestroy {
                 Hls.isSupported()
             ) {
                 console.log('... switching channel to ', channel.name, url);
-                this.hls = new Hls();
+                this.hls = new Hls({
+                    lowLatencyMode: false,
+                    backBufferLength: 60,
+                    enableWorker: true,
+                    manifestLoadingTimeOut: 8000,
+                    manifestLoadingMaxRetry: 2,
+                    levelLoadingMaxRetry: 2,
+                    fragLoadingMaxRetry: 2,
+                    fragLoadingTimeOut: 15000,
+                    xhrSetup: (xhr: any) => {
+                        try {
+                            xhr.withCredentials = false;
+                        } catch {}
+                    },
+                    fetchSetup: (_ctx: any, init: any) => {
+                        try {
+                            init = init || {};
+                            init.referrerPolicy = 'no-referrer';
+                            return init;
+                        } catch {
+                            return init;
+                        }
+                    },
+                } as any);
                 this.hls.attachMedia(this.videoPlayer.nativeElement);
+                this.hls.on(Hls.Events.ERROR, (_e, data: any) => {
+                    if (!data?.fatal) return;
+                    switch (data.type) {
+                        case Hls.ErrorTypes.NETWORK_ERROR:
+                            if (this.hlsRetry++ < this.maxRetry) {
+                                try {
+                                    this.hls.startLoad(0);
+                                } catch {}
+                            } else {
+                                try {
+                                    this.hls.destroy();
+                                } catch {}
+                                // Fallback: try external player (mpv) when available
+                                try {
+                                    this.dataService.sendIpcEvent(OPEN_MPV_PLAYER, { url });
+                                } catch {}
+                            }
+                            break;
+                        case Hls.ErrorTypes.MEDIA_ERROR:
+                            try {
+                                this.hls.recoverMediaError();
+                            } catch {
+                                try {
+                                    this.hls.startLoad(0);
+                                } catch {}
+                            }
+                            break;
+                        default:
+                            try {
+                                this.hls.destroy();
+                            } catch {}
+                            // Fallback to external player
+                            try {
+                                this.dataService.sendIpcEvent(OPEN_MPV_PLAYER, { url });
+                            } catch {}
+                            break;
+                    }
+                });
                 this.hls.on(Hls.Events.MANIFEST_PARSED, () => {
                     const l = this.hls.levels?.[this.hls.currentLevel] || this.hls.levels?.[0];
                     const fps =
