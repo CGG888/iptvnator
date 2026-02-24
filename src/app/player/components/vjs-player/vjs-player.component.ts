@@ -45,6 +45,7 @@ export class VjsPlayerComponent implements OnInit, OnChanges, OnDestroy {
     }>();
     /** VideoJs object */
     player: videoJs.Player;
+    private codecProbed = false;
 
     /**
      * Instantiate Video.js on component init
@@ -72,9 +73,15 @@ export class VjsPlayerComponent implements OnInit, OnChanges, OnDestroy {
                 if (w || h) {
                     this.mediaInfo.emit({ width: w, height: h });
                 }
+                this.probeVhsInternals(); // 通过 VHS 内部结构兜底提取 CODECS/声道
             };
             videoEl.addEventListener('loadedmetadata', onMeta);
             setTimeout(onMeta, 0);
+            const onFirstTimeupdate = () => {
+                this.probeVhsInternals();
+                videoEl.removeEventListener('timeupdate', onFirstTimeupdate);
+            };
+            videoEl.addEventListener('timeupdate', onFirstTimeupdate);
         }
         const ql = (this.player as any)?.qualityLevels?.();
         if (ql && ql.on) {
@@ -139,6 +146,74 @@ export class VjsPlayerComponent implements OnInit, OnChanges, OnDestroy {
             }
             setTimeout(send, 0);
         }
+    }
+
+    private probeVhsInternals() {
+        if (this.codecProbed) return;
+        try {
+            const tech: any = this.player?.tech?.(true);
+            const vhs: any = tech?.vhs || tech?.hls || tech?.hlsHandler || tech?.masterPlaylistController_;
+            const playlists = vhs?.playlists || vhs?.playlistController || vhs?.masterPlaylistController_;
+            const master = playlists?.master || vhs?.master || tech?.vhs?.playlists?.master;
+            const media = playlists?.media?.() || playlists?.media || vhs?.media || tech?.vhs?.playlists?.media?.();
+            // 解析 CODECS
+            let codecs: string | undefined =
+                media?.attributes?.CODECS ||
+                media?.attributes?.codecs ||
+                master?.playlists?.find?.((p: any) => p?.uri === media?.uri)?.attributes?.CODECS;
+            const norm = (s?: string) => {
+                if (!s) return undefined;
+                const l = String(s).toLowerCase();
+                if (l.includes('av01')) return 'AV1';
+                if (l.includes('hev1') || l.includes('hvc1') || l.includes('h265') || l.includes('hevc')) return 'H.265';
+                if (l.includes('avc1') || l.includes('h264') || l.includes('avc')) return 'H.264';
+                if (l.includes('vp09') || l.includes('vp9')) return 'VP9';
+                if (l.includes('mp4v') || l.includes('mpeg4')) return 'MPEG-4';
+                return s.toUpperCase();
+            };
+            const videoCodec = norm(codecs);
+            // 解析声道（CHANNELS）
+            let channelsStr: string | undefined;
+            const audioGroupId =
+                media?.attributes?.AUDIO || media?.attributes?.audio || media?.attributes?.['AUDIO'];
+            const groups = master?.mediaGroups?.AUDIO?.[audioGroupId];
+            if (groups && typeof groups === 'object') {
+                for (const key of Object.keys(groups)) {
+                    const it = groups[key];
+                    if (it?.attributes?.CHANNELS) {
+                        channelsStr = String(it.attributes.CHANNELS);
+                        break;
+                    }
+                }
+            }
+            const parseChannels = (s?: string): number | undefined => {
+                if (!s) return undefined;
+                const t = String(s).toLowerCase();
+                if (t.includes('7.1')) return 8;
+                if (t.includes('5.1')) return 6;
+                if (t.includes('2.0') || t.includes('stereo')) return 2;
+                const num = parseInt(t, 10);
+                return isNaN(num) ? undefined : num;
+            };
+            const audioChannels = parseChannels(channelsStr);
+            const meta: any = {};
+            if (videoCodec) meta.videoCodec = videoCodec;
+            if (typeof audioChannels === 'number') meta.audioChannels = audioChannels;
+            if (Object.keys(meta).length) {
+                this.mediaInfo.emit(meta);
+                this.codecProbed = true;
+            } else {
+                // 延迟重试 2 次，避免初次加载时内部结构尚未构建
+                let retries = 2;
+                const retry = () => {
+                    if (this.codecProbed || retries-- <= 0) return;
+                    const tech2: any = this.player?.tech?.(true);
+                    if (!tech2) return;
+                    setTimeout(() => this.probeVhsInternals(), 300);
+                };
+                retry();
+            }
+        } catch {}
     }
 
     /**

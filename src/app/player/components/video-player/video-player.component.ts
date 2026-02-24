@@ -139,6 +139,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
 
         this.activeChannel$.subscribe((channel) => {
             if (channel?.url) {
+                this.runtimeMeta = {};
                 this.choosePlayerByChannel(channel);
             }
         });
