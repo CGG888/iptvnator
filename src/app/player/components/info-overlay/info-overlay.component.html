@@ -22,10 +22,15 @@
             <span *ngIf="fpsLabel()" class="badge" [ngClass]="isLive ? 'live' : (isReplay ? 'rec' : '')">{{ fpsLabel() }}</span>
             <span *ngIf="audioLabel()" class="badge" [ngClass]="isLive ? 'live' : (isReplay ? 'rec' : '')">{{ audioLabel() }}</span>
             <span *ngIf="isLive" class="badge live">正在直播</span>
-            <span *ngIf="!isLive && isReplay" class="badge rec">正在回放</span>
+            <span *ngIf="!isLive && isReplay && isTimeshift" class="badge rec">时移</span>
+            <span *ngIf="!isLive && isReplay && !isTimeshift" class="badge rec">正在回放</span>
         </div>
         <div class="program-description" *ngIf="epgProgram">
             {{ epgProgram?.desc[0]?.value }}
+        </div>
+        <div class="program-range" *ngIf="epgProgram">
+            <span>{{ start | momentDate: 'YYYYMMDDHHmm ZZ':'MM-DD HH:mm' }}</span>
+            <span>{{ stop | momentDate: 'YYYYMMDDHHmm ZZ':'MM-DD HH:mm' }}</span>
         </div>
         <div class="program-progress" *ngIf="epgProgram">
             <div
@@ -34,10 +39,49 @@
                     width: (finishedDuration * 100) / generalDuration + '%'
                 }"
             ></div>
-            <div class="duration" *ngIf="epgProgram">
-                {{ start | momentDate: 'YYYYMMDDHHmm ZZ':'HH:mm' }}
-                -
-                {{ stop | momentDate: 'YYYYMMDDHHmm ZZ':'HH:mm' }}
+        </div>
+        <div *ngIf="timeshiftEnabled" class="timeshift-overlay">
+            <div class="timeshift-card">
+                <div class="row top">
+                    <span>时移范围：{{ formatOffsetDisplay(timeshiftMaxSec) | slice:0:formatOffsetDisplay(timeshiftMaxSec).indexOf('|') }}</span>
+                    <span>当前时间：{{ formatNow() }}</span>
+                </div>
+                <div class="row slider">
+                    <div class="slider-wrap">
+                        <div *ngIf="timeshiftMaxSec > 0" class="marks">
+                            <div *ngIf="programStartOffsetSec > 0"
+                                 [style.left.%]="programStartPercent"
+                                 class="mark start"></div>
+                            <div *ngIf="programNextOffsetSec > 0"
+                                 [style.left.%]="programNextPercent"
+                                 class="mark next"></div>
+                        </div>
+                        <mat-slider [min]="0"
+                                    [max]="timeshiftMaxSec"
+                                    [step]="timeshiftStepSec || 1"
+                                    color="accent">
+                            <input matSliderThumb
+                                   [ngModel]="sliderValue"
+                                   (ngModelChange)="onSliderInput($event)"
+                                   (change)="onSliderChange(sliderValue)" />
+                        </mat-slider>
+                    </div>
+                    <span class="picked">定位时间：{{ formatOffsetDisplay(timeshiftOffsetSec).split('|')[1] }}</span>
+                    <div class="nudge-group">
+                        <button mat-icon-button [matTooltip]="'回退30秒'" (click)="onNudge( 30 )">
+                            <mat-icon>replay_30</mat-icon>
+                        </button>
+                        <button mat-icon-button [matTooltip]="'回退10分钟'" (click)="onNudge( 600 )">
+                            <mat-icon>fast_rewind</mat-icon>
+                        </button>
+                        <button mat-icon-button [matTooltip]="'前进10分钟'" (click)="onNudge( -600 )">
+                            <mat-icon>fast_forward</mat-icon>
+                        </button>
+                        <button mat-icon-button [matTooltip]="'前进30秒'" (click)="onNudge( -30 )">
+                            <mat-icon>forward_30</mat-icon>
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

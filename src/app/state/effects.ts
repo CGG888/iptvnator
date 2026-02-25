@@ -311,22 +311,34 @@ export class PlaylistEffects {
                 this.store.select(selectActive)
             ),
             map(([action, channels, activeChannel]) => {
-                let adjacentChannel;
-                const index = channels.findIndex(
-                    (channel) => channel.id === activeChannel.id
-                );
-                if (action.direction === 'next') {
-                    if (index === channels.length - 1)
-                        adjacentChannel = activeChannel;
-                    adjacentChannel = channels[index + 1];
-                } else if (action.direction === 'previous') {
-                    if (index === -1 || index === 0)
-                        adjacentChannel = activeChannel;
-                    adjacentChannel = channels[index - 1];
-                }
-                return PlaylistActions.setActiveChannelSuccess({
-                    channel: adjacentChannel,
+                // Deduplicate by display name and 4K flag to avoid switching between alternative sources
+                const is4k = (title: string) =>
+                    /\b(4k|uhd)\b/i.test(title || '') ||
+                    /\b(2160|3840x2160)\b/i.test(title || '');
+                const norm = (n: string) => (n || '').trim().toLowerCase();
+                const order: string[] = [];
+                const unique: Record<string, any> = {};
+                channels.forEach((ch) => {
+                    const key = norm(ch?.name) + (is4k(ch?.name) ? '__4k' : '__sd');
+                    if (!unique[key]) {
+                        unique[key] = ch;
+                        order.push(key);
+                    }
                 });
+                const activeKey =
+                    norm(activeChannel?.name) +
+                    (is4k(activeChannel?.name) ? '__4k' : '__sd');
+                let idx = order.findIndex((k) => k === activeKey);
+                if (idx < 0) idx = 0;
+                let nextIdx = idx;
+                if (action.direction === 'next') {
+                    nextIdx = Math.min(order.length - 1, idx + 1);
+                } else if (action.direction === 'previous') {
+                    nextIdx = Math.max(0, idx - 1);
+                }
+                const nextKey = order[nextIdx];
+                const adjacentChannel = unique[nextKey] || activeChannel;
+                return PlaylistActions.setActiveChannel({ channel: adjacentChannel });
             })
         );
     });

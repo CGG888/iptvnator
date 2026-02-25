@@ -7,12 +7,13 @@ import {
     NgZone,
     OnDestroy,
     OnInit,
+    HostListener,
 } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Store } from '@ngrx/store';
 import { StorageMap } from '@ngx-pwa/local-storage';
-import { Observable, combineLatestWith, filter, map, switchMap } from 'rxjs';
+import { Observable, combineLatestWith, filter, map, switchMap, take } from 'rxjs';
 import { Channel } from '../../../../../shared/channel.interface';
 import {
     CHANNEL_SET_USER_AGENT,
@@ -32,7 +33,9 @@ import {
     selectCurrentEpgProgram,
 } from '../../../state/selectors';
 import { MultiEpgContainerComponent } from '../multi-epg/multi-epg-container.component';
-import { getPlaybackUrl, isMpegtsLikeUrl, stripAfterDollar } from '../../../../../shared/playlist.utils';
+import { buildCatchupUrl, getPlaybackUrl, isMpegtsLikeUrl, stripAfterDollar } from '../../../../../shared/playlist.utils';
+import { EPG_GET_PROGRAM_DONE } from '../../../../../shared/ipc-commands';
+import { EpgProgram } from '../../models/epg-program.model';
 
 /** Possible sidebar view options */
 export type SidebarView = 'CHANNELS' | 'PLAYLISTS';
@@ -42,6 +45,7 @@ type RuntimeMeta = {
     fps?: number;
     audioChannels?: number;
     videoCodec?: string;
+    segmentDuration?: number;
 };
 
 export const COMPONENT_OVERLAY_REF = new InjectionToken(
@@ -70,8 +74,14 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         showCaptions: false,
         showStreamInfoOverlay: true,
         playbackProfile: 'balanced',
+        catchupTemplate: '',
+        timeshiftWindowHours: 3,
     };
     chosenPlayer: VideoPlayer | 'mpegts' = VideoPlayer.VideoJs;
+    nativeControls = false;
+    private nativeControlsAuto = false;
+    activePlaybackUrl: string | null = null;
+    private lastCommitNowMs = 0;
 
     /** IPC Renderer commands list with callbacks */
     commandsList = [
@@ -118,6 +128,15 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     private uiTimer: any;
     private uiIdleMs = 2500;
     runtimeMeta: RuntimeMeta = {};
+    timeshiftEnabled = false;
+    timeshiftMaxSec = 0;
+    timeshiftOffsetSec = 0;
+    private timeshiftTimer: any;
+    private timeshiftSegSec?: number;
+    private currentProgramStartMs?: number;
+    private currentProgramStopMs?: number;
+    private epgPrograms: EpgProgram[] = [];
+    private pendingPointMs?: number;
 
     constructor(
         private activatedRoute: ActivatedRoute,
@@ -131,6 +150,43 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         private store: Store
     ) {}
 
+    /** 键盘快捷键
+     * 上/下：切换频道（前一个/后一个）
+     * 左/右：时移 -/+ 10 分钟；长按利用按键自动重复
+     */
+    @HostListener('window:keydown', ['$event'])
+    onGlobalKeydown(ev: KeyboardEvent) {
+        if (ev.defaultPrevented) return;
+        const tgt = ev.target as HTMLElement | null;
+        if (tgt) {
+            const tag = (tgt.tagName || '').toLowerCase();
+            if (tag === 'input' || tag === 'textarea' || tgt.isContentEditable) {
+                return;
+            }
+        }
+        if (ev.altKey || ev.ctrlKey || ev.metaKey || ev.shiftKey) return;
+        const stepSec = 10 * 60;
+        if (ev.key === 'ArrowUp') {
+            ev.preventDefault();
+            this.store.dispatch(PlaylistActions.setAdjacentChannelAsActive({ direction: 'previous' }));
+        } else if (ev.key === 'ArrowDown') {
+            ev.preventDefault();
+            this.store.dispatch(PlaylistActions.setAdjacentChannelAsActive({ direction: 'next' }));
+        } else if (ev.key === 'ArrowLeft') {
+            if (!this.timeshiftEnabled || !isFinite(this.timeshiftMaxSec)) return;
+            ev.preventDefault();
+            let next = Math.min(this.timeshiftMaxSec, (this.timeshiftOffsetSec || 0) + stepSec);
+            if (next < 0) next = 0;
+            this.onTimeshiftCommit(next);
+        } else if (ev.key === 'ArrowRight') {
+            if (!this.timeshiftEnabled) return;
+            ev.preventDefault();
+            let next = Math.max(0, (this.timeshiftOffsetSec || 0) - stepSec);
+            if (next <= this.liveEdgeThreshold()) next = 0;
+            this.onTimeshiftCommit(next);
+        }
+    }
+
     /**
      * Sets video player and subscribes to channel list from the store
      */
@@ -139,10 +195,80 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         this.setRendererListeners();
         this.getPlaylistUrlAsParam();
 
+        this.dataService.listenOn(EPG_GET_PROGRAM_DONE, (_e: any, resp: any) => {
+            try {
+                const items: EpgProgram[] = resp?.payload?.items || [];
+                this.epgPrograms = Array.isArray(items) ? items : [];
+                if (this.timeshiftOffsetSec > 0 && this.pendingPointMs) {
+                    const found = this.findEpgProgramAt(this.pendingPointMs);
+                    if (found) {
+                        this.store.dispatch(PlaylistActions.setCurrentEpgProgram({ program: found as any }));
+                    }
+                }
+            } catch {
+                this.epgPrograms = [];
+            }
+        });
+
         this.activeChannel$.subscribe((channel) => {
             if (channel?.url) {
                 this.runtimeMeta = {};
+                // On channel change or source switch: force return to LIVE and clear replay/timeshift context
+                this.pendingPointMs = undefined;
+                this.activePlaybackUrl = null;
+                this.store.dispatch(PlaylistActions.setCurrentEpgProgram(undefined as any));
+                this.resetTimeshiftState(channel);
+                this.epgPrograms = [];
                 this.choosePlayerByChannel(channel);
+            }
+        });
+        // Keep player state consistent with EPG-driven replay/live changes
+        this.store.select(selectActive).subscribe((active) => {
+            if (!active?.url) return;
+            const isEpgReplay = !!active?.epgParams;
+            if (isEpgReplay) {
+                if (!this.nativeControls) {
+                    this.nativeControls = true;
+                    this.nativeControlsAuto = true;
+                }
+                if (this.timeshiftOffsetSec !== 0 || this.activePlaybackUrl) {
+                    this.timeshiftOffsetSec = 0;
+                    this.activePlaybackUrl = null;
+                    this.choosePlayerByChannel(active as any);
+                }
+            } else {
+                if (this.nativeControls && this.nativeControlsAuto) {
+                    this.nativeControls = false;
+                }
+                this.nativeControlsAuto = false;
+                if (this.timeshiftOffsetSec !== 0 || this.activePlaybackUrl) {
+                    this.timeshiftOffsetSec = 0;
+                    this.activePlaybackUrl = null;
+                    this.choosePlayerByChannel(active as any);
+                }
+            }
+        });
+        this.epgProgram$.subscribe((p) => {
+            this.currentProgramStartMs = this.parseEpgStartMs(p);
+            this.currentProgramStopMs = this.parseEpgStopMs(p);
+            const now = Date.now();
+            const s = this.currentProgramStartMs;
+            const e = this.currentProgramStopMs;
+            const isLiveProgram =
+                !!p &&
+                typeof s === 'number' &&
+                typeof e === 'number' &&
+                now >= s &&
+                now <= e;
+            if (!p || isLiveProgram) {
+                if (this.timeshiftOffsetSec !== 0 || this.activePlaybackUrl) {
+                    this.timeshiftOffsetSec = 0;
+                    this.activePlaybackUrl = null;
+                    this.pendingPointMs = undefined;
+                    this.activeChannel$.pipe(take(1)).subscribe((ch) => {
+                        this.choosePlayerByChannel(ch);
+                    });
+                }
             }
         });
 
@@ -233,6 +359,9 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
                             ? settings.showStreamInfoOverlay
                             : true,
                     playbackProfile: settings.playbackProfile || 'balanced',
+                    catchupTemplate: (settings as any).catchupTemplate || '',
+                    timeshiftWindowHours:
+                        (settings as any).timeshiftWindowHours ?? 3,
                 };
             }
         });
@@ -240,20 +369,18 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
 
     choosePlayerByChannel(channel: Channel) {
         const rawUrl = channel?.url || '';
-        const isCatchup = String(channel?.epgParams || '').startsWith('catchup:');
-        const playbackUrl = this.getActiveSrc(channel);
+        const isCatchup = String(channel?.epgParams || '').startsWith('catchup:') || this.timeshiftOffsetSec > this.liveEdgeThreshold();
+        const playbackUrl = this.getActiveSrc(channel, this.timeshiftOffsetSec);
         const pref = this.playerSettings.player;
         if (pref === VideoPlayer.Mpegts) {
             this.chosenPlayer = 'mpegts';
             return;
         }
         if (pref === VideoPlayer.Auto) {
-            // 回放：无论频道原始地址如何，统一使用 HTML5（回放模板通常为 m3u8 单播）
             if (isCatchup) {
                 this.chosenPlayer = VideoPlayer.Html5Player;
                 return;
             }
-            // 非回放：组播/TS 网关走 mpegts，其余走 HTML5
             this.chosenPlayer = isMpegtsLikeUrl(rawUrl)
                 ? 'mpegts'
                 : VideoPlayer.Html5Player;
@@ -262,8 +389,144 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         this.chosenPlayer = pref as VideoPlayer;
     }
 
-    getActiveSrc(channel: Channel): string {
+    getActiveSrc(channel: Channel, offsetSec?: number): string {
+        if (offsetSec && offsetSec > 0) {
+            const snap = this.timeshiftSnapSec();
+            const snapped = Math.max(0, Math.floor(offsetSec / snap) * snap);
+            const baseNow = this.lastCommitNowMs || Date.now();
+            const start = new Date(baseNow - snapped * 1000);
+            const end = new Date(start.getTime() + 30 * 60 * 1000);
+            const fmt = (d: Date) => {
+                const pad = (n: number) => (n < 10 ? '0' + n : '' + n);
+                const yyyy = d.getUTCFullYear();
+                const MM = pad(d.getUTCMonth() + 1);
+                const dd = pad(d.getUTCDate());
+                const HH = pad(d.getUTCHours());
+                const mm = pad(d.getUTCMinutes());
+                const ss = pad(d.getUTCSeconds());
+                return `${yyyy}${MM}${dd}${HH}${mm}${ss}`;
+            };
+            const startUtc = fmt(start);
+            const endUtc = fmt(end);
+            const tpl =
+                channel?.catchup?.source ||
+                (this.playerSettings?.catchupTemplate || '').trim();
+            if (tpl) {
+                return buildCatchupUrl(tpl, startUtc, endUtc);
+            }
+        }
         return getPlaybackUrl(channel as any);
+    }
+
+    private buildActiveSrcForCommit(offset: number, baseNowMs: number): string | null {
+        if (!offset || offset <= 0) return null;
+        let url: string | null = null;
+        const sub = this.activeChannel$.pipe(take(1)).subscribe((ch) => {
+            if (!ch) return;
+            const snap = this.timeshiftSnapSec();
+            const snapped = Math.max(0, Math.floor(offset / snap) * snap);
+            const start = new Date(baseNowMs - snapped * 1000);
+            const end = new Date(start.getTime() + 30 * 60 * 1000);
+            const pad = (n: number) => (n < 10 ? '0' + n : '' + n);
+            const fmt = (d: Date) =>
+                `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}${pad(
+                    d.getUTCHours()
+                )}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}`;
+            const tpl = ch?.catchup?.source || (this.playerSettings?.catchupTemplate || '').trim();
+            if (tpl) url = buildCatchupUrl(tpl, fmt(start), fmt(end));
+        });
+        sub.unsubscribe();
+        return url;
+    }
+
+    private fmtLocalYmdHMZZ(ms: number): string {
+        const pad = (n: number) => (n < 10 ? '0' + n : '' + n);
+        const d = new Date(ms);
+        const yyyy = d.getFullYear();
+        const MM = pad(d.getMonth() + 1);
+        const dd = pad(d.getDate());
+        const HH = pad(d.getHours());
+        const mm = pad(d.getMinutes());
+        const tzOffset = -d.getTimezoneOffset(); // minutes east of UTC
+        const sign = tzOffset >= 0 ? '+' : '-';
+        const abs = Math.abs(tzOffset);
+        const tzh = pad(Math.floor(abs / 60));
+        const tzm = pad(abs % 60);
+        return `${yyyy}${MM}${dd}${HH}${mm} ${sign}${tzh}${tzm}`;
+    }
+
+    private makeEphemeralProgram(pointMs: number) {
+        const startMs = Math.max(0, pointMs);
+        const stopMs = startMs + 30 * 60 * 1000;
+        return {
+            start: this.fmtLocalYmdHMZZ(startMs),
+            stop: this.fmtLocalYmdHMZZ(stopMs),
+            channel: '',
+            title: [{ lang: 'zh', value: '时移' }],
+            desc: [],
+            category: [],
+            date: [],
+            episodeNum: [],
+            previouslyShown: [],
+            subtitles: [],
+            icon: [],
+            rating: [],
+            credits: [],
+            audio: [],
+            _attributes: {
+                start: this.fmtLocalYmdHMZZ(startMs),
+                stop: this.fmtLocalYmdHMZZ(stopMs),
+            },
+        };
+    }
+
+    private parseEpgDateToMs(str?: string): number | undefined {
+        if (!str) return undefined;
+        const s = String(str).trim();
+        let m =
+            s.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})\s*([+-])?(\d{2})?(\d{2})?$/) ||
+            s.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})\s*([+-])?(\d{2})?(\d{2})?$/);
+        if (!m) return undefined;
+        const Y = Number(m[1]);
+        const Mo = Number(m[2]) - 1;
+        const D = Number(m[3]);
+        const H = Number(m[4]);
+        const Mi = Number(m[5]);
+        const S = m.length > 6 && m[6] ? Number(m[6]) : 0;
+        const sign = m[m.length - 3] as string | undefined;
+        const oh = m[m.length - 2] ? Number(m[m.length - 2]) : undefined;
+        const om = m[m.length - 1] ? Number(m[m.length - 1]) : undefined;
+        let offsetMin: number;
+        if (sign && typeof oh === 'number' && typeof om === 'number') {
+            offsetMin = (sign === '+' ? 1 : -1) * (oh * 60 + om);
+        } else {
+            offsetMin = -new Date().getTimezoneOffset();
+        }
+        const utc = Date.UTC(Y, Mo, D, H, Mi, S);
+        return utc - offsetMin * 60 * 1000;
+    }
+
+    private fmtYmdHmZZ(ms: number): string {
+        // Use local-time format with real offset to keep consistency with EPG list
+        return this.fmtLocalYmdHMZZ(ms);
+    }
+
+    private findEpgProgramAt(pointMs: number): EpgProgram | undefined {
+        const items = this.epgPrograms || [];
+        if (!items.length) return undefined;
+        for (const p of items) {
+            const sMs = this.parseEpgDateToMs((p as any).start);
+            const eMs = this.parseEpgDateToMs((p as any).stop);
+            if (typeof sMs === 'number' && typeof eMs === 'number') {
+                if (pointMs >= sMs && pointMs <= eMs) {
+                    const clone: any = { ...p };
+                    clone.start = this.fmtYmdHmZZ(sMs);
+                    clone.stop = this.fmtYmdHmZZ(eMs);
+                    return clone as EpgProgram;
+                }
+            }
+        }
+        return undefined;
     }
 
     onMediaInfo(meta: RuntimeMeta) {
@@ -278,7 +541,168 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
             filtered.audioChannels = meta.audioChannels;
         if (typeof meta.videoCodec === 'string' && meta.videoCodec.trim())
             filtered.videoCodec = meta.videoCodec.trim();
+        if (typeof meta.segmentDuration === 'number' && meta.segmentDuration > 0) {
+            this.timeshiftSegSec = meta.segmentDuration;
+        }
         this.runtimeMeta = { ...this.runtimeMeta, ...filtered };
+    }
+
+    private resetTimeshiftState(channel: Channel) {
+        const hasTpl =
+            Boolean(channel?.catchup?.source) ||
+            Boolean(this.playerSettings?.catchupTemplate);
+        const days = Number(channel?.catchup?.days || '0');
+        const userHours =
+            typeof this.playerSettings?.timeshiftWindowHours === 'number'
+                ? Math.max(1, Math.min(72, Math.floor(this.playerSettings.timeshiftWindowHours)))
+                : 3;
+        const providerHours = days > 0 ? days * 24 : Number.POSITIVE_INFINITY;
+        const maxHours = Math.max(1, Math.floor(Math.min(providerHours, userHours)));
+        if (hasTpl && maxHours > 0) {
+            this.timeshiftEnabled = true;
+            this.timeshiftMaxSec = maxHours * 3600;
+            this.timeshiftOffsetSec = 0;
+        } else {
+            this.timeshiftEnabled = false;
+            this.timeshiftMaxSec = 0;
+            this.timeshiftOffsetSec = 0;
+        }
+    }
+
+    onTimeshiftPreview(v: number) {
+        this.timeshiftOffsetSec = v || 0;
+    }
+
+    onTimeshiftCommit(v: number) {
+        this.timeshiftOffsetSec = v || 0;
+        this.lastCommitNowMs = Date.now();
+        if (this.timeshiftOffsetSec > 0) {
+            if (!this.nativeControls) {
+                this.nativeControls = true;
+                this.nativeControlsAuto = true;
+            }
+        } else {
+            if (this.nativeControls && this.nativeControlsAuto) {
+                this.nativeControls = false;
+            }
+            this.nativeControlsAuto = false;
+        }
+        const subUrl = this.buildActiveSrcForCommit(this.timeshiftOffsetSec, this.lastCommitNowMs);
+        this.activePlaybackUrl = subUrl;
+        if (this.timeshiftOffsetSec > 0) {
+            const point = this.lastCommitNowMs - this.timeshiftOffsetSec * 1000;
+            this.pendingPointMs = point;
+            const found = this.findEpgProgramAt(point);
+            if (found) {
+                this.store.dispatch(PlaylistActions.setCurrentEpgProgram({ program: found as any }));
+            } else {
+                const p = this.makeEphemeralProgram(point);
+                this.store.dispatch(PlaylistActions.setCurrentEpgProgram({ program: p as any }));
+            }
+        } else {
+            this.pendingPointMs = undefined;
+            this.activePlaybackUrl = null;
+            this.store.dispatch(PlaylistActions.resetActiveEpgProgram());
+            this.store.dispatch(PlaylistActions.setCurrentEpgProgram(undefined as any));
+        }
+        if (this.timeshiftTimer) {
+            clearTimeout(this.timeshiftTimer);
+            this.timeshiftTimer = null;
+        }
+        this.timeshiftTimer = setTimeout(() => {
+            this.activeChannel$.pipe(take(1)).subscribe((ch) => {
+                this.choosePlayerByChannel(ch);
+            });
+        }, 300);
+    }
+
+    private timeshiftSnapSec(): number {
+        if (this.timeshiftSegSec && isFinite(this.timeshiftSegSec)) {
+            const v = Math.max(1, Math.min(10, Math.round(this.timeshiftSegSec)));
+            return v;
+        }
+        const profile = this.playerSettings?.playbackProfile || 'balanced';
+        return profile === 'low' ? 2 : 6;
+    }
+
+    private liveEdgeThreshold(): number {
+        return 8;
+    }
+
+    get timeshiftStepSec(): number {
+        return this.timeshiftSnapSec();
+    }
+
+    get programStartOffsetSec(): number {
+        if (!this.timeshiftEnabled) return 0;
+        if (!this.currentProgramStartMs) return 0;
+        const now = Date.now();
+        let d = Math.floor((now - this.currentProgramStartMs) / 1000);
+        if (d < 0) d = 0;
+        if (this.timeshiftMaxSec && d > this.timeshiftMaxSec)
+            d = this.timeshiftMaxSec;
+        return d;
+    }
+
+    get programNextOffsetSec(): number {
+        if (!this.timeshiftEnabled) return 0;
+        if (!this.currentProgramStopMs) return 0;
+        const now = Date.now();
+        let d = Math.floor((now - this.currentProgramStopMs) / 1000);
+        if (d < 0) d = 0;
+        if (this.timeshiftMaxSec && d > this.timeshiftMaxSec)
+            d = this.timeshiftMaxSec;
+        return d;
+    }
+
+    private parseEpgStartMs(p: any): number | undefined {
+        if (!p) return undefined;
+        if (p.start) {
+            const t = Date.parse(p.start);
+            if (!isNaN(t)) return t;
+        }
+        const raw = p?._attributes?.start || '';
+        const m = String(raw).match(
+            /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})/
+        );
+        if (m) {
+            const [_, y, M, d, h, mnt] = m;
+            const dt = Date.UTC(
+                Number(y),
+                Number(M) - 1,
+                Number(d),
+                Number(h),
+                Number(mnt),
+                0
+            );
+            return dt;
+        }
+        return undefined;
+    }
+
+    private parseEpgStopMs(p: any): number | undefined {
+        if (!p) return undefined;
+        if (p.stop) {
+            const t = Date.parse(p.stop);
+            if (!isNaN(t)) return t;
+        }
+        const raw = p?._attributes?.stop || '';
+        const m = String(raw).match(
+            /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})/
+        );
+        if (m) {
+            const [_, y, M, d, h, mnt] = m;
+            const dt = Date.UTC(
+                Number(y),
+                Number(M) - 1,
+                Number(d),
+                Number(h),
+                Number(mnt),
+                0
+            );
+            return dt;
+        }
+        return undefined;
     }
 
     ngOnDestroy() {

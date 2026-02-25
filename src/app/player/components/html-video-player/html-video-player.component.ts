@@ -27,6 +27,8 @@ import { DataService } from '../../../services/data.service';
 export class HtmlVideoPlayerComponent implements OnChanges, OnDestroy {
     /** Channel to play  */
     @Input() channel: Channel;
+    @Input() playbackUrl?: string;
+    @Input() nativeControls = false;
     dataService: DataService; // Declare the dataService property
     @Output() mediaInfo = new EventEmitter<{
         width?: number;
@@ -34,6 +36,7 @@ export class HtmlVideoPlayerComponent implements OnChanges, OnDestroy {
         fps?: number;
         audioChannels?: number;
         videoCodec?: string;
+        segmentDuration?: number;
     }>();
     private fpsEstimated = false;
     private fpsTimer: any;
@@ -62,6 +65,10 @@ export class HtmlVideoPlayerComponent implements OnChanges, OnDestroy {
     ngOnChanges(changes: SimpleChanges): void {
         if (changes.channel && changes.channel.currentValue) {
             this.playChannel(changes.channel.currentValue);
+        } else if (changes.playbackUrl && !changes.playbackUrl.isFirstChange()) {
+            if (this.channel) {
+                this.playChannel(this.channel);
+            }
         }
     }
 
@@ -73,7 +80,7 @@ export class HtmlVideoPlayerComponent implements OnChanges, OnDestroy {
         if (this.hls) this.hls.destroy();
         if (channel.url) {
             this.hlsRetry = 0;
-            const url = getPlaybackUrl(channel as any);
+            const url = this.playbackUrl || getPlaybackUrl(channel as any);
             const extension = getExtensionFromUrl(stripAfterDollar(channel.url));
             this.dataService.sendIpcEvent(CHANNEL_SET_USER_AGENT, {
                 userAgent: channel.http?.['user-agent'] ?? '',
@@ -109,6 +116,7 @@ export class HtmlVideoPlayerComponent implements OnChanges, OnDestroy {
                 };
                 const baseCfg: any = {
                     enableWorker: true,
+                    startLevel: 0,
                     manifestLoadingTimeOut: 8000,
                     manifestLoadingMaxRetry: 2,
                     levelLoadingMaxRetry: 2,
@@ -132,6 +140,27 @@ export class HtmlVideoPlayerComponent implements OnChanges, OnDestroy {
                 const tuningCfg = profiles[this.tuning] || profiles['balanced'];
                 this.hls = new Hls({ ...baseCfg, ...tuningCfg } as any);
                 this.hls.attachMedia(this.videoPlayer.nativeElement);
+                this.hls.on(Hls.Events.MANIFEST_LOADED, (_e, d: any) => {
+                    const td =
+                        d?.levels?.[d?.firstLevel || 0]?.details?.targetduration ||
+                        d?.levels?.[0]?.details?.targetduration ||
+                        d?.targetduration ||
+                        undefined;
+                    if (typeof td === 'number' && isFinite(td) && td > 0) {
+                        this.mediaInfo.emit({ segmentDuration: td });
+                    }
+                    try {
+                        if (Array.isArray(d?.levels) && d.levels.length > 0) {
+                            this.hls.nextLevel = 0;
+                        }
+                    } catch {}
+                });
+                this.hls.on(Hls.Events.LEVEL_LOADED, (_e, d: any) => {
+                    const td = d?.details?.targetduration;
+                    if (typeof td === 'number' && isFinite(td) && td > 0) {
+                        this.mediaInfo.emit({ segmentDuration: td });
+                    }
+                });
                 this.hls.on(Hls.Events.ERROR, (_e, data: any) => {
                     if (!data?.fatal) return;
                     switch (data.type) {
@@ -233,6 +262,11 @@ export class HtmlVideoPlayerComponent implements OnChanges, OnDestroy {
                     if (typeof ac === 'number') meta.audioChannels = ac;
                     if (videoCodec) meta.videoCodec = videoCodec;
                     if (Object.keys(meta).length) this.mediaInfo.emit(meta);
+                    try {
+                        if (typeof fps === 'number' && fps > 0 && this.hls.autoLevelEnabled) {
+                            this.hls.autoLevelCapping = -1;
+                        }
+                    } catch {}
                 });
                 this.hls.on(Hls.Events.AUDIO_TRACK_SWITCHED, () => {
                     const ac = this.extractAudioChannels();

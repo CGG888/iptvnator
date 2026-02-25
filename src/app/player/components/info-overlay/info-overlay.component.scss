@@ -4,7 +4,7 @@
     width: 100%;
     background: #2c2b2fdc;
     min-height: 130px;
-    max-height: 165px;
+    max-height: 220px;
     margin-left: auto;
     margin-right: auto;
     left: 0;
@@ -41,7 +41,7 @@
 }
 
 .program-title-row {
-    width: 96%;
+    width: 100%;
     margin: 8px 0 12px;
     display: flex;
     align-items: center;
@@ -85,24 +85,38 @@
 
 .content {
     width: 100%;
+    pointer-events: auto;
+    /* 让右侧留白与左侧台标区域（100px）对称 */
+    padding-right: 100px;
+    box-sizing: border-box;
 }
 
 .program-progress {
-    width: 96%;
+    width: 100%;
     background: #ccc;
     height: 20px;
     margin-top: 8px;
     margin-bottom: 8px;
 }
 
+.program-range {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: #eee;
+    padding: 0 4px;
+    margin-top: 6px;
+}
+
 .program-name {
-    width: 96%;
+    width: 100%;
     max-height: 20px;
     -webkit-line-clamp: 1;
 }
 
 .program-description {
-    width: 96%;
+    width: 100%;
     max-height: 55px;
     -webkit-line-clamp: 3;
 }
@@ -133,4 +147,71 @@
     visibility: hidden;
     opacity: 0;
     transition: visibility 0s 2s, opacity 2s linear;
+}
+
+/* Timeshift controls (moved from toolbar) */
+.timeshift-overlay {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    .timeshift-card {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 8px 12px;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        box-shadow: 0 1px 2px rgba(0,0,0,.35);
+        backdrop-filter: blur(2px);
+    }
+    .row.top {
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        color: #eee;
+        padding: 0 4px;
+        margin-bottom: 6px;
+    }
+    .row.slider {
+        display: flex;
+        align-items: center;
+        position: relative;
+        gap: 8px;
+        .slider-wrap {
+            position: relative;
+            flex: 1 1 auto;
+            min-width: 0;
+            mat-slider {
+                display: block;
+                width: 100%;
+            }
+        }
+        .marks {
+            position: absolute;
+            top: -6px;
+            left: 0;
+            right: 0;
+            height: 6px;
+            .mark {
+                position: absolute;
+                width: 2px;
+                height: 6px;
+            }
+            .start { background: #ff4081; }
+            .next { background: #03a9f4; }
+        }
+        .picked {
+            margin-left: 8px;
+            min-width: 160px;
+            color: #eee;
+            font-size: 12px;
+        }
+        .nudge-group {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+    }
 }

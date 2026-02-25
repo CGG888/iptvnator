@@ -16,9 +16,18 @@
                 (toggleLeftDrawerClicked)="drawer.toggle()"
                 (toggleRightDrawerClicked)="drawerRight.toggle()"
                 (multiEpgClicked)="openMultiEpgView()"
+                (toggleNativeControls)="nativeControls = !nativeControls"
                 [activeChannel]="activeChannel"
                 [runtimeMeta]="runtimeMeta"
+                [timeshiftEnabled]="timeshiftEnabled"
+                [timeshiftMaxSec]="timeshiftMaxSec"
+                [timeshiftOffsetSec]="timeshiftOffsetSec"
+                [timeshiftStepSec]="timeshiftStepSec"
+                [nativeControls]="nativeControls"
+                (timeshiftPreview)="onTimeshiftPreview($event)"
+                (timeshiftCommit)="onTimeshiftCommit($event)"
             />
+
 
             <app-audio-player
                 *ngIf="activeChannel.radio === 'true'; else videoPlayer"
@@ -34,14 +43,7 @@
                      (mouseleave)="onUiMouseLeave()">
                 <app-vjs-player
                     *ngIf="chosenPlayer === 'videojs'"
-                    [options]="{
-                        sources: [
-                            {
-                                src: getActiveSrc(activeChannel),
-                                type: 'application/x-mpegURL',
-                            },
-                        ],
-                    }"
+                    [options]="{ sources: [{ src: (activePlaybackUrl || getActiveSrc(activeChannel, 0)), type: 'application/x-mpegURL' }] }"
                     (mediaInfo)="onMediaInfo($event)"
                     [class.hide-captions]="!playerSettings.showCaptions"
                 ></app-vjs-player>
@@ -49,6 +51,8 @@
                 <app-html-video-player
                     *ngIf="chosenPlayer === 'html5'"
                     [channel]="activeChannel"
+                    [playbackUrl]="activePlaybackUrl"
+                    [nativeControls]="nativeControls"
                     [showCaptions]="playerSettings.showCaptions"
                     [tuning]="playerSettings.playbackProfile || 'balanced'"
                     (mediaInfo)="onMediaInfo($event)"
@@ -97,6 +101,15 @@
                     [epgProgram]="epgProgram$ | async"
                     [controlsActive]="uiActive"
                     [runtimeMeta]="runtimeMeta"
+                    [isTimeshift]="timeshiftEnabled && timeshiftOffsetSec > 0"
+                    [timeshiftEnabled]="timeshiftEnabled"
+                    [timeshiftMaxSec]="timeshiftMaxSec"
+                    [timeshiftOffsetSec]="timeshiftOffsetSec"
+                    [timeshiftStepSec]="timeshiftStepSec"
+                    [programStartOffsetSec]="programStartOffsetSec"
+                    [programNextOffsetSec]="programNextOffsetSec"
+                    (timeshiftPreview)="onTimeshiftPreview($event)"
+                    (timeshiftCommit)="onTimeshiftCommit($event)"
                 ></app-info-overlay>
                 </div>
             </ng-template>

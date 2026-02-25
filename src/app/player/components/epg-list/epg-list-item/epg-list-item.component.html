@@ -23,7 +23,7 @@
     "
     class="rec badge"
     [matTooltip]="'EPG.TIMESHIFT_AVAILABLE' | translate"
-    >{{ isActiveProgram() ? '正在回放' : '已播' }}</span
+    >{{ isActiveProgram() ? (isTimeshift ? '时移' : '正在回放') : '已播' }}</span
 >
 <span
     (click)="$event.stopPropagation(); showDescription(item)"

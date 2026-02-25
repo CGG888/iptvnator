@@ -20,6 +20,10 @@ export class EpgListItemComponent {
 
     /** Currently active/playing program */
     @Input() activeProgram?: EpgProgram;
+    /** Whether current session is timeshift (active item should show '时移') */
+    @Input() isTimeshift = false;
+    /** Whether current session is live (active item should show '正在直播') */
+    @Input() isLive = false;
 
     isActiveProgram(): boolean {
         if (!this.activeProgram || !this.item) return false;

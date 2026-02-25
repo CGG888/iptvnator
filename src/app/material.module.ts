@@ -17,6 +17,7 @@ import { MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatSliderModule } from '@angular/material/slider';
 
 @NgModule({
     exports: [
@@ -38,6 +39,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
         MatTooltipModule,
         MatCheckboxModule,
         MatMenuModule,
+        MatSliderModule,
     ],
 })
 export class MaterialModule {}

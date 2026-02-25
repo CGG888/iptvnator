@@ -38,6 +38,7 @@ export class MpegtsPlayerComponent implements OnChanges, OnDestroy {
         fps?: number;
         audioChannels?: number;
         videoCodec?: string;
+        segmentDuration?: number;
     }>();
 
     constructor(private dataService: DataService) {}

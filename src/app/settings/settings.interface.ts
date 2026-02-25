@@ -30,4 +30,6 @@ export interface Settings {
     updateSource?: 'auto' | 'github' | 'cdn';
     showStreamInfoOverlay?: boolean;
     playbackProfile?: 'low' | 'balanced' | 'robust';
+    catchupTemplate?: string;
+    timeshiftWindowHours?: number;
 }

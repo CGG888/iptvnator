@@ -1,4 +1,4 @@
-import { Component, Input, OnChanges, SimpleChanges } from '@angular/core';
+import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
 import moment from 'moment';
 import { Channel } from '../../../../../shared/channel.interface';
 import { EpgProgram } from '../../models/epg-program.model';
@@ -18,6 +18,19 @@ export class InfoOverlayComponent implements OnChanges {
 
     /** Whether player UI/controls are active (mouse activity) */
     @Input() controlsActive = true;
+
+    /** Whether current playback is timeshift (slider) instead of full replay */
+    @Input() isTimeshift = false;
+
+    /** Timeshift controls (moved from toolbar) */
+    @Input() timeshiftEnabled = false;
+    @Input() timeshiftMaxSec = 0;
+    @Input() timeshiftOffsetSec = 0;
+    @Input() timeshiftStepSec = 1;
+    @Input() programStartOffsetSec = 0;
+    @Input() programNextOffsetSec = 0;
+    @Output() timeshiftPreview = new EventEmitter<number>();
+    @Output() timeshiftCommit = new EventEmitter<number>();
 
     @Input() runtimeMeta:
         | {
@@ -48,6 +61,85 @@ export class InfoOverlayComponent implements OnChanges {
     currentTimeout;
     isReplay = false;
     isLive = false;
+
+    get sliderValue(): number {
+        const max = Math.max(0, Math.floor(Number(this.timeshiftMaxSec || 0)));
+        const off = Math.max(0, Math.floor(Number(this.timeshiftOffsetSec || 0)));
+        const mapped = Math.max(0, Math.min(max, max - off));
+        return mapped;
+    }
+
+    private toOffsetFromSlider(sliderV: number): number {
+        const max = Math.max(0, Math.floor(Number(this.timeshiftMaxSec || 0)));
+        const v = Math.max(0, Math.min(max, Math.floor(Number(sliderV || 0))));
+        return max - v;
+    }
+
+    get programStartPercent(): number {
+        if (!this.timeshiftEnabled || !this.timeshiftMaxSec) return 0;
+        const v = Math.max(0, Math.min(this.timeshiftMaxSec, this.programStartOffsetSec || 0));
+        return (v / this.timeshiftMaxSec) * 100;
+    }
+
+    get programNextPercent(): number {
+        if (!this.timeshiftEnabled || !this.timeshiftMaxSec) return 0;
+        const v = Math.max(0, Math.min(this.timeshiftMaxSec, this.programNextOffsetSec || 0));
+        return (v / this.timeshiftMaxSec) * 100;
+    }
+
+    onSliderInput(v: number | null) {
+        if (typeof v !== 'number') return;
+        const mapped = this.toOffsetFromSlider(v);
+        this.timeshiftPreview.emit(mapped);
+    }
+
+    onSliderChange(v: number | null) {
+        if (typeof v !== 'number') return;
+        const mapped = this.toOffsetFromSlider(v);
+        this.timeshiftCommit.emit(mapped);
+    }
+
+    onNudge(delta: number) {
+        if (!this.timeshiftEnabled) return;
+        const next = Math.max(
+            0,
+            Math.min(this.timeshiftMaxSec || 0, (this.timeshiftOffsetSec || 0) + delta)
+        );
+        this.timeshiftCommit.emit(next);
+    }
+
+    formatNow(): string {
+        const nowMs = Date.now();
+        const d = new Date(nowMs);
+        const pad = (n: number) => (n < 10 ? '0' + n : '' + n);
+        const MM = pad(d.getMonth() + 1);
+        const DD = pad(d.getDate());
+        const HH = pad(d.getHours());
+        const mm = pad(d.getMinutes());
+        return `${MM}-${DD} ${HH}:${mm}`;
+    }
+
+    formatOffsetDisplay(s: number | null | undefined): string {
+        const nowMs = Date.now();
+        const startMs = nowMs - Math.max(0, Math.floor(Number(this.timeshiftMaxSec || 0))) * 1000;
+        const pickedMs = nowMs - Math.max(0, Math.floor(Number(s || 0))) * 1000;
+        const fmt = (ms: number, withDate: boolean) => {
+            const d = new Date(ms);
+            const pad = (n: number) => (n < 10 ? '0' + n : '' + n);
+            const MM = pad(d.getMonth() + 1);
+            const DD = pad(d.getDate());
+            const HH = pad(d.getHours());
+            const mm = pad(d.getMinutes());
+            return withDate ? `${MM}-${DD} ${HH}:${mm}` : `${HH}:${mm}`;
+        };
+        const needsDate =
+            new Date(startMs).getDate() !== new Date(nowMs).getDate() ||
+            new Date(pickedMs).getDate() !== new Date(nowMs).getDate();
+        const left = fmt(startMs, needsDate);
+        const right = fmt(nowMs, needsDate);
+        const mid = fmt(pickedMs, needsDate);
+        return `${left} — ${right} | ${mid}`;
+    }
 
     /**
      * Calculates the necessary information for the visualization in the overview popup

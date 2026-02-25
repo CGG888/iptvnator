@@ -157,6 +157,8 @@ export const playlistReducer = createReducer(
     on(PlaylistActions.setActivePlaylist, (state, action): PlaylistState => {
         return {
             ...state,
+            active: undefined,
+            currentEpgProgram: undefined,
             playlists: {
                 ...state.playlists,
                 selectedId: action.playlistId,

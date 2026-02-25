@@ -202,6 +202,25 @@
         <mat-divider></mat-divider>
         <div class="row">
             <div class="column">
+                回看模板
+                <p>未在频道声明回看模板时，使用此模板生成回看地址</p>
+            </div>
+            <div class="column">
+                <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>例如 https://server/asset/index.m3u8?start=&#123;utc:yyyyMMddHHmmss&#125;&end=&#123;utcend:yyyyMMddHHmmss&#125;</mat-label>
+                    <input matInput type="text" formControlName="catchupTemplate" />
+                </mat-form-field>
+                <div style="display:flex; gap:12px; align-items:center;">
+                    <mat-form-field appearance="outline" style="width: 220px;">
+                        <mat-label>时移窗口（小时）</mat-label>
+                        <input matInput type="number" min="1" max="72" formControlName="timeshiftWindowHours" />
+                    </mat-form-field>
+                </div>
+            </div>
+        </div>
+        <mat-divider></mat-divider>
+        <div class="row">
+            <div class="column">
                 {{ 'SETTINGS.PLAYER_TUNING' | translate }}
                 <p>{{ 'SETTINGS.PLAYER_TUNING_DESCRIPTION' | translate }}</p>
             </div>

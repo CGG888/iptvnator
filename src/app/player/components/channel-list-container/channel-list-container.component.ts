@@ -3,7 +3,7 @@ import {
     DragDropModule,
     moveItemInArray,
 } from '@angular/cdk/drag-drop';
-import { ScrollingModule } from '@angular/cdk/scrolling';
+import { CdkVirtualScrollViewport, ScrollingModule } from '@angular/cdk/scrolling';
 import { CommonModule, TitleCasePipe } from '@angular/common';
 import {
     Component,
@@ -11,6 +11,8 @@ import {
     HostListener,
     Input,
     ViewChild,
+    OnInit,
+    AfterViewInit,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatDividerModule } from '@angular/material/divider';
@@ -29,6 +31,7 @@ import { Channel } from '../../../../../shared/channel.interface';
 import { FilterPipe } from '../../../shared/pipes/filter.pipe';
 import * as PlaylistActions from '../../../state/actions';
 import {
+    selectActive,
     selectActivePlaylistId,
     selectFavorites,
 } from '../../../state/selectors';
@@ -57,7 +60,7 @@ import { ChannelListItemComponent } from './channel-list-item/channel-list-item.
         ScrollingModule,
     ],
 })
-export class ChannelListContainerComponent {
+export class ChannelListContainerComponent implements OnInit, AfterViewInit {
     /**
      * Channels array
      * Create local copy of the store for local manipulations without updates in the store
@@ -98,6 +101,9 @@ export class ChannelListContainerComponent {
 
     /** Search field element */
     @ViewChild('search') searchElement: ElementRef;
+    /** Virtual scroll viewport to control scroll position */
+    @ViewChild(CdkVirtualScrollViewport, { static: false })
+    private viewport?: CdkVirtualScrollViewport;
 
     /** Register ctrl+f as keyboard hotkey to focus the search input field */
     @HostListener('document:keypress', ['$event'])
@@ -135,6 +141,32 @@ export class ChannelListContainerComponent {
         private snackBar: MatSnackBar,
         private translateService: TranslateService
     ) {}
+
+    ngOnInit(): void {
+        // Keep selection and scroll in sync with active channel
+        this.store.select(selectActive).subscribe((active) => {
+            if (!active?.id) return;
+            this.selected = active;
+            this.scrollActiveIntoCenter();
+        });
+    }
+
+    ngAfterViewInit(): void {
+        this.scrollActiveIntoCenter();
+    }
+
+    private scrollActiveIntoCenter() {
+        try {
+            if (!this.viewport || !this._channelList || !this.selected?.id) return;
+            const idx = this._channelList.findIndex((c) => c.id === this.selected.id);
+            if (idx < 0) return;
+            const itemSize = 50; // must match itemSize in template
+            const viewportSize = this.viewport.getViewportSize();
+            const target =
+                Math.max(0, idx * itemSize - Math.max(0, (viewportSize - itemSize) / 2));
+            this.viewport.scrollToOffset(target, 'smooth');
+        } catch {}
+    }
 
     /**
      * Sets clicked channel as selected and emits them to the parent component

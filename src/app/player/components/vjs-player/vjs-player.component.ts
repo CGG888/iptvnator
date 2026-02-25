@@ -42,6 +42,7 @@ export class VjsPlayerComponent implements OnInit, OnChanges, OnDestroy {
         fps?: number;
         audioChannels?: number;
         videoCodec?: string;
+        segmentDuration?: number;
     }>();
     /** VideoJs object */
     player: videoJs.Player;

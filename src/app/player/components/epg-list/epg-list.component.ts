@@ -1,4 +1,4 @@
-import { Component, NgZone } from '@angular/core';
+import { Component, NgZone, ViewChild, ElementRef } from '@angular/core';
 import { Store } from '@ngrx/store';
 import moment from 'moment';
 import { Observable } from 'rxjs';
@@ -10,7 +10,7 @@ import {
     setActiveEpgProgram,
     setCurrentEpgProgram,
 } from '../../../state/actions';
-import { selectActive } from '../../../state/selectors';
+import { selectActive, selectCurrentEpgProgram } from '../../../state/selectors';
 import { EpgChannel } from '../../models/epg-channel.model';
 import { EpgProgram } from '../../models/epg-program.model';
 
@@ -54,6 +54,18 @@ export class EpgListComponent {
     /** Timeshift availability date, based on tvg-rec value from the channel */
     timeshiftUntil$: Observable<string>;
 
+    /** Program provided by player (timeshift/EPG selection) */
+    private currentProgramFromStore?: EpgProgram;
+    /** Program list container to scroll */
+    @ViewChild('programList', { static: false })
+    private programListRef: ElementRef<HTMLElement> | undefined;
+    /** Whether currently in timeshift session (not live relative to real now) */
+    isTimeshiftActive = false;
+    /** Whether currently live session */
+    isLiveSession = true;
+    /** Whether current replay comes from EPG selection */
+    private isReplayByEpg = false;
+
     /**
      * Creates an instance of EpgListComponent
      * @param store
@@ -77,6 +89,11 @@ export class EpgListComponent {
      * Subscribe for values from the store on component init
      */
     ngOnInit(): void {
+        // Track active channel to detect EPG-driven replay via epgParams
+        this.store.select(selectActive).subscribe((active) => {
+            this.isReplayByEpg = !!active?.epgParams;
+        });
+
         this.timeshiftUntil$ = this.store.select(selectActive).pipe(
             // eslint-disable-next-line @ngrx/avoid-mapping-selectors
             map((active) => {
@@ -97,6 +114,52 @@ export class EpgListComponent {
                     .format(DATE_TIME_FORMAT)
             )
         );
+
+        // Sync list with timeshift/current program from store
+        this.store.select(selectCurrentEpgProgram).subscribe((p) => {
+            this.currentProgramFromStore = p;
+            const realNow = moment(Date.now()).format(DATE_TIME_FORMAT);
+            this.isTimeshiftActive = !!p && !this.isReplayByEpg;
+            this.isLiveSession = !p;
+            if (p) {
+                // switch base date/time to program day
+                this.dateToday = moment(p.start, DATE_TIME_FORMAT).format(
+                    DATE_FORMAT
+                );
+                this.timeNow = realNow;
+                if (this.programs) {
+                    const selected = this.selectPrograms(this.programs);
+                    this.items =
+                        selected.length > 0
+                            ? selected
+                            : this.generatePlaceholdersForDate(this.dateToday);
+                    this.playingNow =
+                        this.items.find(
+                            (it) =>
+                                it.start === p.start && it.stop === p.stop
+                        ) || p;
+                    this.scrollToActive();
+                }
+            } else {
+                // back to live
+                this.isTimeshiftActive = false;
+                this.isLiveSession = true;
+                const now = moment(Date.now());
+                this.dateToday = now.format(DATE_FORMAT);
+                this.timeNow = now.format(DATE_TIME_FORMAT);
+                if (this.programs) {
+                    const selected = this.selectPrograms(this.programs);
+                    this.items =
+                        selected.length > 0
+                            ? selected
+                            : this.generatePlaceholdersForDate(this.dateToday);
+                    if (this.items.length > 0) {
+                        this.setPlayingNow();
+                        this.scrollToActive();
+                    }
+                }
+            }
+        });
     }
 
     
@@ -108,12 +171,53 @@ export class EpgListComponent {
     handleEpgData(programs: { payload: EpgData }): void {
         this.programs = programs;
         this.timeNow = moment(Date.now()).format(DATE_TIME_FORMAT);
-        this.dateToday = moment(Date.now()).format(DATE_FORMAT);
-        this.channel = programs?.payload?.channel ?? this.channel;
+        if (!this.dateToday) {
+            this.dateToday = moment(Date.now()).format(DATE_FORMAT);
+        }
+        const incomingChannel = programs?.payload?.channel ?? this.channel;
+        const incomingId = incomingChannel?.id;
+        const prevProgram = this.currentProgramFromStore;
+        this.channel = incomingChannel;
         const selected = this.selectPrograms(programs);
-        this.items = selected.length > 0 ? selected : this.generatePlaceholdersForDate(this.dateToday);
-        if (this.items.length > 0) this.setPlayingNow();
-        else this.store.dispatch(setCurrentEpgProgram(undefined));
+        this.items =
+            selected.length > 0
+                ? selected
+                : this.generatePlaceholdersForDate(this.dateToday);
+        // If program in store belongs to another channel, treat as live and recompute
+        const sameChannel =
+            prevProgram && typeof prevProgram.channel === 'string'
+                ? prevProgram.channel === incomingId
+                : true;
+        if (prevProgram && sameChannel) {
+            this.playingNow =
+                this.items.find(
+                    (it) =>
+                        it.start === prevProgram.start &&
+                        it.stop === prevProgram.stop
+                ) || prevProgram;
+            this.scrollToActive();
+        } else {
+            // Different channel or no program: back to live of the new channel
+            this.store.dispatch(setCurrentEpgProgram(undefined));
+            if (this.items.length > 0) {
+                this.setPlayingNow();
+                this.scrollToActive();
+            }
+        }
+    }
+
+    private scrollToActive() {
+        setTimeout(() => {
+            try {
+                const host = this.programListRef?.nativeElement;
+                if (!host || !this.playingNow?.start) return;
+                const sel = `.mat-mdc-list-option[data-start="${this.playingNow.start}"]`;
+                const el = host.querySelector(sel) as HTMLElement;
+                if (el && typeof el.scrollIntoView === 'function') {
+                    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                }
+            } catch {}
+        }, 0);
     }
 
     /**

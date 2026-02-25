@@ -50,6 +50,7 @@
     <!-- program list -->
     <mat-selection-list
         id="program-list"
+        #programList
         [multiple]="false"
         hideSingleSelectionIndicator="true"
         *ngIf="timeshiftUntil$ | async as timeshiftUntil"
@@ -57,10 +58,13 @@
         <ng-container *ngIf="items?.length > 0; else epgNotAvailable">
             <ng-container *ngFor="let item of items">
                 <mat-list-option
+                    [attr.data-start]="item.start"
+                    [class.active]="playingNow?.start === item.start && playingNow?.stop === item.stop"
                     *ngIf="
                         item.start < timeshiftUntil || item.start >= timeNow;
                         else timeshiftItem
                     "
+                    (click)="(timeNow >= item.start && timeNow <= item.stop) ? setEpgProgram(item, true, false) : null"
                 >
                     <div matListItemTitle>{{ item?.title[0]?.value }}</div>
                     <div matListItemLine>
@@ -68,17 +72,18 @@
                             [timeshiftUntil]="timeshiftUntil"
                             [timeNow]="timeNow"
                             [activeProgram]="playingNow"
+                            [isTimeshift]="isTimeshiftActive"
+                            [isLive]="isLiveSession"
                             [item]="item"
                         ></app-epg-list-item>
                     </div>
                 </mat-list-option>
                 <ng-template #timeshiftItem>
                     <mat-list-option
+                        [attr.data-start]="item.start"
                         [value]="item"
-                        [class.active]="
-                            timeNow >= item.start && timeNow <= item.stop
-                        "
-                        (click)="setEpgProgram(item, false, true)"
+                        [class.active]="playingNow?.start === item.start && playingNow?.stop === item.stop"
+                        (click)="(timeNow >= item.start && timeNow <= item.stop) ? setEpgProgram(item, true, false) : setEpgProgram(item, false, true)"
                     >
                         <div matListItemTitle [innerHTML]="item?.title[0]?.value"></div>
                         <div matListItemLine>
@@ -86,6 +91,8 @@
                                 [timeshiftUntil]="timeshiftUntil"
                                 [timeNow]="timeNow"
                                 [activeProgram]="playingNow"
+                                [isTimeshift]="isTimeshiftActive"
+                                [isLive]="isLiveSession"
                                 [item]="item"
                             ></app-epg-list-item>
                         </div>

@@ -23,6 +23,21 @@
     </button>
     {{ activeChannel?.name }}
     <div class="spacer"></div>
+    <!-- Timeshift slider moved into info-overlay to prevent toolbar crowding -->
+    <div *ngIf="timeshiftEnabled" style="display:flex; gap:2px; align-items:center; margin-left:8px">
+        <button mat-icon-button [matTooltip]="nativeControls ? '隐藏原生控件' : '显示原生控件'" (click)="toggleNativeControls.emit()">
+            <mat-icon>{{ nativeControls ? 'cancel_presentation' : 'smart_display' }}</mat-icon>
+        </button>
+        <button *ngIf="timeshiftEnabled" mat-icon-button [matTooltip]="'返回直播 (LIVE)'" (click)="goLive()">
+            <mat-icon>fiber_manual_record</mat-icon>
+        </button>
+        <button *ngIf="timeshiftEnabled && programStartOffsetSec > 0" mat-icon-button [matTooltip]="'跳到节目起点'" (click)="jumpTo(programStartOffsetSec)">
+            <mat-icon>skip_previous</mat-icon>
+        </button>
+        <button *ngIf="timeshiftEnabled && programNextOffsetSec > 0" mat-icon-button [matTooltip]="'跳到下一节目'" (click)="jumpTo(programNextOffsetSec)">
+            <mat-icon>skip_next</mat-icon>
+        </button>
+    </div>
     <ng-container *ngIf="isEpgAvailable$ | async">
         <button
             mat-icon-button
