@@ -139,6 +139,7 @@ export class EpgListComponent {
                                 it.start === p.start && it.stop === p.stop
                         ) || p;
                     this.scrollToActive();
+                    setTimeout(() => this.updateMarqueeOverflow(), 0);
                 }
             } else {
                 // back to live
@@ -156,6 +157,7 @@ export class EpgListComponent {
                     if (this.items.length > 0) {
                         this.setPlayingNow();
                         this.scrollToActive();
+                        setTimeout(() => this.updateMarqueeOverflow(), 0);
                     }
                 }
             }
@@ -204,6 +206,7 @@ export class EpgListComponent {
                 this.scrollToActive();
             }
         }
+        setTimeout(() => this.updateMarqueeOverflow(), 0);
     }
 
     private scrollToActive() {
@@ -331,5 +334,23 @@ export class EpgListComponent {
      */
     ngOnDestroy(): void {
         this.electronService.removeAllListeners(EPG_GET_PROGRAM_DONE);
+    }
+
+    private updateMarqueeOverflow() {
+        try {
+            const host = this.programListRef?.nativeElement;
+            if (!host) return;
+            const nodes = host.querySelectorAll('.marquee');
+            nodes.forEach((node: Element) => {
+                const parent = node as HTMLElement;
+                const content = parent.querySelector(
+                    '.marquee-content'
+                ) as HTMLElement | null;
+                if (!content) return;
+                const need =
+                    content.scrollWidth > parent.clientWidth + 1;
+                parent.classList.toggle('overflow', need);
+            });
+        } catch {}
     }
 }

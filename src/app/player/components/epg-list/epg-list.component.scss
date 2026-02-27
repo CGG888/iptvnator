@@ -83,3 +83,42 @@ mat-selection-list {
         font-size: 0.9em;
     }
 }
+
+/* Marquee for long program titles */
+.marquee {
+    position: relative;
+    overflow: hidden;
+    white-space: nowrap;
+    line-height: 1.2;
+}
+.marquee .marquee-content {
+    display: inline-block;
+    padding-right: 48px;
+    will-change: transform;
+    animation: none;
+}
+.marquee.overflow .marquee-content {
+    animation: epg-marquee 12s linear infinite;
+}
+@keyframes epg-marquee {
+    0% {
+        transform: translateX(0);
+    }
+    100% {
+        transform: translateX(-100%);
+    }
+}
+
+/* Override Angular Material default ellipsis in list titles to allow marquee */
+:host ::ng-deep #program-list .mat-mdc-list-item-title.marquee {
+    text-overflow: clip !important;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+/* Unify EPG list title font to match channel list (0.9em) */
+:host ::ng-deep #program-list .mat-mdc-list-item-title,
+:host ::ng-deep #program-list .mdc-list-item__primary-text {
+    font-size: 0.9em !important;
+    line-height: 1.2 !important;
+}

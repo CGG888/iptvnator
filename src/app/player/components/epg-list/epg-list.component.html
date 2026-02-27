@@ -66,7 +66,7 @@
                     "
                     (click)="(timeNow >= item.start && timeNow <= item.stop) ? setEpgProgram(item, true, false) : null"
                 >
-                    <div matListItemTitle>{{ item?.title[0]?.value }}</div>
+                    <div matListItemTitle class="marquee"><span class="marquee-content">{{ item?.title[0]?.value }}</span></div>
                     <div matListItemLine>
                         <app-epg-list-item
                             [timeshiftUntil]="timeshiftUntil"
@@ -85,7 +85,7 @@
                         [class.active]="playingNow?.start === item.start && playingNow?.stop === item.stop"
                         (click)="(timeNow >= item.start && timeNow <= item.stop) ? setEpgProgram(item, true, false) : setEpgProgram(item, false, true)"
                     >
-                        <div matListItemTitle [innerHTML]="item?.title[0]?.value"></div>
+                        <div matListItemTitle class="marquee"><span class="marquee-content" [innerHTML]="item?.title[0]?.value"></span></div>
                         <div matListItemLine>
                             <app-epg-list-item
                                 [timeshiftUntil]="timeshiftUntil"

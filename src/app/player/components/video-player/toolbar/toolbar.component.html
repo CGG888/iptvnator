@@ -38,39 +38,37 @@
             <mat-icon>skip_next</mat-icon>
         </button>
     </div>
-    <ng-container *ngIf="isEpgAvailable$ | async">
+    <button
+        mat-icon-button
+        [matMenuTriggerFor]="sourceMenu"
+        [matTooltip]="'TOP_MENU.SWITCH_SOURCE' | translate"
+        *ngIf="getAlternativeSources().length > 1"
+    >
+        <mat-icon>swap_horiz</mat-icon>
+    </button>
+    <mat-menu #sourceMenu="matMenu">
         <button
-            mat-icon-button
-            [matMenuTriggerFor]="sourceMenu"
-            [matTooltip]="'TOP_MENU.SWITCH_SOURCE' | translate"
-            *ngIf="getAlternativeSources().length > 1"
+            mat-menu-item
+            *ngFor="let src of getAlternativeSources()"
+            (click)="switchSource(src)"
         >
-            <mat-icon>swap_horiz</mat-icon>
+            <mat-icon *ngIf="src.url === activeChannel?.url">radio_button_checked</mat-icon>
+            <mat-icon *ngIf="src.url !== activeChannel?.url">radio_button_unchecked</mat-icon>
+            <span>{{ sourceLabel(src) }}</span>
         </button>
-        <mat-menu #sourceMenu="matMenu">
-            <button
-                mat-menu-item
-                *ngFor="let src of getAlternativeSources()"
-                (click)="switchSource(src)"
-            >
-                <mat-icon *ngIf="src.url === activeChannel?.url">radio_button_checked</mat-icon>
-                <mat-icon *ngIf="src.url !== activeChannel?.url">radio_button_unchecked</mat-icon>
-                <span>{{ sourceLabel(src) }}</span>
-            </button>
-        </mat-menu>
-        <button
-            mat-icon-button
-            (click)="multiEpgClicked.emit()"
-            [matTooltip]="'TOP_MENU.OPEN_MULTI_EPG' | translate"
-        >
-            <mat-icon>view_list</mat-icon>
-        </button>
-        <button
-            mat-button
-            (click)="toggleRightDrawerClicked.emit()"
-            [matTooltip]="'TOP_MENU.OPEN_EPG_LIST' | translate"
-        >
-            EPG
-        </button>
-    </ng-container>
+    </mat-menu>
+    <button
+        mat-icon-button
+        (click)="multiEpgClicked.emit()"
+        [matTooltip]="'TOP_MENU.OPEN_MULTI_EPG' | translate"
+    >
+        <mat-icon>view_list</mat-icon>
+    </button>
+    <button
+        mat-button
+        (click)="toggleRightDrawerClicked.emit()"
+        [matTooltip]="'TOP_MENU.OPEN_EPG_LIST' | translate"
+    >
+        EPG
+    </button>
 </mat-toolbar>

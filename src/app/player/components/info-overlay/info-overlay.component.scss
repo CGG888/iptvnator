@@ -42,7 +42,7 @@
 
 .program-title-row {
     width: 100%;
-    margin: 8px 0 12px;
+    margin: 6px 0 6px;
     display: flex;
     align-items: center;
 }
@@ -95,8 +95,8 @@
     width: 100%;
     background: #ccc;
     height: 20px;
-    margin-top: 8px;
-    margin-bottom: 8px;
+    margin-top: 4px;
+    margin-bottom: 4px;
 }
 
 .program-range {
@@ -106,7 +106,7 @@
     font-size: 12px;
     color: #eee;
     padding: 0 4px;
-    margin-top: 6px;
+    margin-top: 2px;
 }
 
 .program-name {
@@ -154,11 +154,11 @@
     width: 100%;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 4px;
     .timeshift-card {
         width: 100%;
         box-sizing: border-box;
-        padding: 8px 12px;
+        padding: 6px 12px;
         border-radius: 8px;
         background: rgba(255, 255, 255, 0.06);
         border: 1px solid rgba(255, 255, 255, 0.12);
@@ -171,13 +171,13 @@
         font-size: 12px;
         color: #eee;
         padding: 0 4px;
-        margin-bottom: 6px;
+        margin-bottom: 4px;
     }
     .row.slider {
         display: flex;
         align-items: center;
         position: relative;
-        gap: 8px;
+        gap: 6px;
         .slider-wrap {
             position: relative;
             flex: 1 1 auto;
@@ -189,7 +189,7 @@
         }
         .marks {
             position: absolute;
-            top: -6px;
+            top: -4px;
             left: 0;
             right: 0;
             height: 6px;
@@ -202,7 +202,7 @@
             .next { background: #03a9f4; }
         }
         .picked {
-            margin-left: 8px;
+            margin-left: 6px;
             min-width: 160px;
             color: #eee;
             font-size: 12px;
