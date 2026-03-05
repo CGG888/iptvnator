@@ -1,36 +1,166 @@
+
+/* Host styling */
+:host {
+    display: block;
+    width: 100%;
+}
+
+/* 
+ * Custom Layout for Channel Item
+ * By bypassing the Material List directives (matListItemTitle/Line/Meta),
+ * we gain full control over the flex layout to ensure truncation works as expected.
+ */
+.channel-item-layout {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    overflow: hidden; /* Force clipping */
+    box-sizing: border-box;
+    /* Reserve space for badges (Star 24 + R 20 + Gap 6 + Padding 8 ~ 60px) */
+    /* Increased to 80px to give more breathing room and prevent any overlap perception */
+    position: relative;
+    padding-right: 80px;
+}
+
+/* Reset internal padding of mat-list-item content if needed */
+::ng-deep .mdc-list-item__content {
+    /* Make sure the content container takes full width and doesn't restrict our custom layout */
+    width: 100% !important;
+    padding-right: 8px !important; /* Keep right padding for visual balance */
+    overflow: hidden !important;
+    display: block !important; /* Override flex to allow our inner flex to control everything */
+}
+
+/* 1. Drag Handle */
+.drag-icon {
+    flex: 0 0 auto;
+    width: 24px;
+    cursor: move;
+    opacity: 0.5;
+    transform: scale(0.9);
+    margin-right: 8px;
+}
+
+/* 2. Channel Logo */
+.channel-logo {
+    flex: 0 0 auto;
+    width: 54px; /* Matches user preference */
+    height: 36px;
+    border-radius: 4px;
+    object-fit: contain;
+    background: transparent;
+    margin-right: 12px;
+}
+
+/* 3. Text Container (Middle - Flexible) */
+.text-container {
+    flex: 1 1 0px; /* CRITICAL: Force basis to 0 to ignore content width */
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    overflow: hidden;
+    /* padding-right removed, handled by parent container padding */
+}
+
 .channel-name {
+    display: block;
+    width: 100%;
+    font-size: 1rem;
+    font-weight: 500;
+    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    display: -webkit-box;
-    -webkit-line-clamp: 1;
-    -webkit-box-orient: vertical;
-    font-size: 0.9em;
-    max-width: 290px;
+    line-height: 1.4;
 }
 
+.program-line {
+    display: block;
+    width: 100%;
+    font-size: 0.85rem;
+    opacity: 0.7;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.4;
+    
+    /* Ensure children don't break layout */
+    span {
+        display: inline;
+    }
+
+    .separator {
+        opacity: 0.5;
+        margin: 0 6px;
+    }
+    
+    .program-title {
+        opacity: 0.8;
+    }
+}
+
+/* 4. Badges (Right - Fixed Absolute) */
+.badges {
+    position: absolute;
+    right: 8px; /* Offset from the edge for aesthetics */
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    height: 100%; /* Ensure click area */
+    pointer-events: auto; /* Ensure clickable */
+    z-index: 2; /* Ensure above text if overlap (though padding prevents it) */
+}
+
+/* Replay Badge (R) */
+.badge-replay {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid currentColor;
+    border-radius: 2px;
+    padding: 0 3px;
+    font-size: 11px;
+    height: 16px;
+    line-height: 16px;
+    opacity: 0.7;
+    font-weight: 500;
+    color: inherit;
+    flex-shrink: 0;
+}
+
+/* Star Icon */
+.inline-star {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    flex-shrink: 0;
+    
+    mat-icon {
+        font-size: 20px;
+        width: 20px;
+        height: 20px;
+        line-height: 20px;
+    }
+}
+
+/* Active State */
 .active {
-    background: #ddd;
+    background: rgba(0, 0, 0, 0.05);
 }
 
-::ng-deep {
-    .mat-mdc-list-item-avatar.channel-logo {
-        width: 48px !important;
-        height: 32px !important;
-        border-radius: 4px !important;
-        object-fit: contain;
-        background: transparent !important;
-        background-color: transparent !important;
-    }
-
-    .dark-theme {
-        .active {
-            background: #000;
-        }
-    }
+::ng-deep .dark-theme .active {
+    background: rgba(255, 255, 255, 0.1);
 }
 
-.drag-icon {
-    cursor: move;
-    margin-left: 0;
-    margin-right: 0;
+/* Fix for horizontal scrollbar in viewport */
+::ng-deep mat-nav-list, ::ng-deep .scroll-viewport {
+    overflow-x: hidden !important;
 }

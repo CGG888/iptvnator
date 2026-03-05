@@ -1,7 +1,7 @@
 <div id="playlists-navigation">
     <div class="current-playlist">
         <div class="left">
-            <button mat-icon-button matTooltip="Back" (click)="goBack()">
+            <button mat-icon-button [matTooltip]="'COMMON.BACK' | translate" (click)="goBack()">
                 <mat-icon>arrow_back_ios</mat-icon>
             </button>
             <div class="playlist-info">

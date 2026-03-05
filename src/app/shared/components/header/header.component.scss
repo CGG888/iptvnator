@@ -1,9 +1,17 @@
 :host {
-    background: #1b1c1c;
-    color: #fff;
     display: flex;
     width: 100%;
     --mat-toolbar-standard-height: 100px;
+}
+
+:host-context(.dark-theme) {
+    background: #1b1c1c;
+    color: #fff;
+}
+
+:host-context(:not(.dark-theme)) {
+    background: #f0f1f1;
+    color: #151515;
 }
 
 .logo {
@@ -28,7 +36,7 @@
     }
 
     .subtitle {
-        color: #999;
+        color: #666;
         font-size: 0.7em;
         margin-top: 5px;
         text-wrap: pretty;

@@ -175,7 +175,8 @@ export class HtmlVideoPlayerComponent implements OnChanges, OnDestroy {
                                 } catch {}
                                 // Fallback: try external player (mpv) when available
                                 try {
-                                    this.dataService.sendIpcEvent(OPEN_MPV_PLAYER, { url });
+                                    const cleanUrl = stripAfterDollar(url);
+                                    this.dataService.sendIpcEvent(OPEN_MPV_PLAYER, { url: cleanUrl });
                                 } catch {}
                             }
                             break;
@@ -194,7 +195,8 @@ export class HtmlVideoPlayerComponent implements OnChanges, OnDestroy {
                             } catch {}
                             // Fallback to external player
                             try {
-                                this.dataService.sendIpcEvent(OPEN_MPV_PLAYER, { url });
+                                const cleanUrl = stripAfterDollar(url);
+                                this.dataService.sendIpcEvent(OPEN_MPV_PLAYER, { url: cleanUrl });
                             } catch {}
                             break;
                     }

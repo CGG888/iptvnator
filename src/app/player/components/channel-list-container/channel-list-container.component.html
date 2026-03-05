@@ -39,8 +39,15 @@
                                 | translate)
                         "
                         [logo]="channel?.tvg?.logo"
+                        [group]="channel?.group?.title || ('CHANNELS.UNGROUPED' | translate)"
+                        [programTitle]="getProgramTitle(channel?.id)"
+                        [hasReplay]="isReplayCapable(channel)"
+                        [tooltip]="getProgramTooltip(channel?.id)"
                         (clicked)="selectChannel(channel)"
                         [selected]="selected?.id === channel?.id"
+                        [showFavoriteButton]="true"
+                        [isFavorite]="(favoritesIds$ | async)?.includes(channel?.id)"
+                        (favoriteToggled)="toggleFavoriteChannel(channel, $event)"
                     />
                 </cdk-virtual-scroll-viewport>
             </mat-nav-list>
@@ -58,7 +65,7 @@
                     <ng-container
                         *ngFor="let groups of groupedChannels | keyvalue"
                     >
-                        <mat-expansion-panel>
+                        <mat-expansion-panel (opened)="onGroupOpened(groups.value)">
                             <mat-expansion-panel-header
                                 *ngIf="groups.value.length > 0"
                             >
@@ -87,8 +94,15 @@
                                                 | translate)
                                         "
                                         [logo]="channel?.tvg?.logo"
+                                        [group]="channel?.group?.title || ('CHANNELS.UNGROUPED' | translate)"
+                                        [programTitle]="getProgramTitle(channel?.id)"
+                                        [hasReplay]="isReplayCapable(channel)"
+                                        [tooltip]="getProgramTooltip(channel?.id)"
                                         (clicked)="selectChannel(channel)"
                                         [selected]="selected?.id === channel.id"
+                                        [showFavoriteButton]="true"
+                                        [isFavorite]="(favoritesIds$ | async)?.includes(channel?.id)"
+                                        (favoriteToggled)="toggleFavoriteChannel(channel, $event)"
                                     ></app-channel-list-item>
                                 </ng-container>
                             </ng-template>
@@ -130,6 +144,7 @@
                         (clicked)="selectChannel(channel)"
                         [selected]="selected?.id === channel?.id"
                         [showFavoriteButton]="true"
+                        [isFavorite]="true"
                         (favoriteToggled)="
                             toggleFavoriteChannel(channel, $event)
                         "

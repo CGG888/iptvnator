@@ -80,11 +80,11 @@ export class SettingsComponent implements OnInit {
     electronPlayers = [
         {
             id: VideoPlayer.MPV,
-            label: 'MPV Player',
+            labelKey: 'SETTINGS.PLAYER_MPV',
         },
         {
             id: VideoPlayer.VLC,
-            label: 'VLC',
+            labelKey: 'SETTINGS.PLAYER_VLC',
         },
     ];
 
@@ -92,19 +92,19 @@ export class SettingsComponent implements OnInit {
     players = [
         {
             id: VideoPlayer.Auto,
-            label: 'Auto Player',
+            labelKey: 'SETTINGS.PLAYER_AUTO',
         },
         {
             id: VideoPlayer.Html5Player,
-            label: 'HTML5 Video Player',
+            labelKey: 'SETTINGS.PLAYER_HTML5',
         },
         {
             id: VideoPlayer.VideoJs,
-            label: 'VideoJs Player',
+            labelKey: 'SETTINGS.PLAYER_VIDEOJS',
         },
         {
             id: VideoPlayer.Mpegts,
-            label: 'MPEGTS (mpegts.js)',
+            labelKey: 'SETTINGS.PLAYER_MPEGTS',
         },
         ...(this.isElectron ? this.electronPlayers : []),
     ];

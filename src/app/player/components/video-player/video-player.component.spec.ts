@@ -97,4 +97,39 @@ describe('VideoPlayerComponent', () => {
             showCaptions: false,
         });
     });
+
+    it('should select mpegts player for RTSP streams', () => {
+        component.playerSettings = {
+            player: VideoPlayer.Auto,
+        } as any;
+        const channel = {
+            url: 'rtsp://test.com/stream',
+        };
+        component.choosePlayerByChannel(channel as any);
+        expect(component.chosenPlayer).toBe('mpegts');
+    });
+
+    it('should select mpegts player for RTSP catchup streams', () => {
+        component.playerSettings = {
+            player: VideoPlayer.Auto,
+        } as any;
+        const channel = {
+            url: 'rtsp://test.com/stream',
+            epgParams: 'catchup:20230101:20230102',
+        };
+        component.choosePlayerByChannel(channel as any);
+        expect(component.chosenPlayer).toBe('mpegts');
+    });
+
+    it('should select html5 player for HTTP catchup streams', () => {
+        component.playerSettings = {
+            player: VideoPlayer.Auto,
+        } as any;
+        const channel = {
+            url: 'http://test.com/stream',
+            epgParams: 'catchup:20230101:20230102',
+        };
+        component.choosePlayerByChannel(channel as any);
+        expect(component.chosenPlayer).toBe(VideoPlayer.Html5Player);
+    });
 });

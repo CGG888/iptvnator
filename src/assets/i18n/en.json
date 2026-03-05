@@ -90,6 +90,9 @@
     },
     "FILTER_BY_NAME": "Filter by name",
     "FILTER_BY_TYPE": "Filter by type",
+    "FILTER_TYPE_M3U": "M3U (local, url, text)",
+    "FILTER_TYPE_XTREAM": "Xtream",
+    "FILTER_TYPE_STALKER": "Stalker",
     "IMPORTED_AS_TEXT": "Imported as text",
     "PARSING_ERROR": "Error: Parsing failed, not a valid playlist:"
   },
@@ -102,6 +105,16 @@
     "REFRESH_EPG": "Refresh EPG",
     "VIDEO_PLAYER_LABEL": "Video player",
     "VIDEO_PLAYER_PLACEHOLDER": "Select an option",
+    "EPG_URL_ADD_DESC": "Add single or multiple URLs as EPG sources",
+    "PLAYER_AUTO": "Auto Player",
+    "PLAYER_HTML5": "HTML5 Video Player",
+    "PLAYER_VIDEOJS": "Video.js Player",
+    "PLAYER_MPEGTS": "Mpegts.js Player",
+    "PLAYER_MPV": "MPV Player",
+    "PLAYER_VLC": "VLC Player",
+    "CATCHUP_TEMPLATE_LABEL": "Catch-up Template",
+    "CATCHUP_TEMPLATE_DESC": "Used when channel has no catchup-source to generate replay URLs",
+    "TIMESHIFT_WINDOW_LABEL": "Timeshift Window (hours)",
     "VERSION": "Version",
     "SAVE_CHANGES": "Save changes",
     "BACK_TO_HOME": "Back to home",
@@ -283,6 +296,10 @@
       "PLAYLIST_SETTINGS": "Playlist Settings",
       "HOME": "Home",
       "DELETE": "Delete"
+    },
+    "COMMON": {
+      "BACK": "Back",
+      "REPLAY_TOOLTIP": "Replay/time-shift available"
     },
     "EMPTY_LIST_VIEW": {
       "NO_SEARCH_RESULTS": "Nothing found, try to change you search request"

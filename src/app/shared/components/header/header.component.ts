@@ -69,17 +69,17 @@ export class HeaderComponent implements OnInit {
 
     playlistTypes = [
         {
-            title: 'M3U (local, url, text)',
+            titleKey: 'HOME.FILTER_TYPE_M3U',
             id: 'm3u',
             checked: true,
         },
         {
-            title: 'Xtream',
+            titleKey: 'HOME.FILTER_TYPE_XTREAM',
             id: 'xtream',
             checked: true,
         },
         {
-            title: 'Stalker',
+            titleKey: 'HOME.FILTER_TYPE_STALKER',
             id: 'stalker',
             checked: true,
         },

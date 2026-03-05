@@ -18,6 +18,7 @@ import { Channel } from '../../../../../shared/channel.interface';
 import {
     CHANNEL_SET_USER_AGENT,
     ERROR,
+    OPEN_MPV_PLAYER,
     PLAYLIST_PARSE_BY_URL,
     PLAYLIST_PARSE_RESPONSE,
 } from '../../../../../shared/ipc-commands';
@@ -33,7 +34,7 @@ import {
     selectCurrentEpgProgram,
 } from '../../../state/selectors';
 import { MultiEpgContainerComponent } from '../multi-epg/multi-epg-container.component';
-import { buildCatchupUrl, getPlaybackUrl, isMpegtsLikeUrl, stripAfterDollar } from '../../../../../shared/playlist.utils';
+import { buildCatchupUrl, getExtensionFromUrl, getPlaybackUrl, isMpegtsLikeUrl, stripAfterDollar } from '../../../../../shared/playlist.utils';
 import { EPG_GET_PROGRAM_DONE } from '../../../../../shared/ipc-commands';
 import { EpgProgram } from '../../models/epg-program.model';
 
@@ -77,7 +78,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
         catchupTemplate: '',
         timeshiftWindowHours: 3,
     };
-    chosenPlayer: VideoPlayer | 'mpegts' = VideoPlayer.VideoJs;
+    chosenPlayer: VideoPlayer | 'mpegts' | 'mpv' = VideoPlayer.VideoJs;
     nativeControls = false;
     private nativeControlsAuto = false;
     activePlaybackUrl: string | null = null;
@@ -369,27 +370,75 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
 
     choosePlayerByChannel(channel: Channel) {
         const rawUrl = channel?.url || '';
-        const isCatchup = String(channel?.epgParams || '').startsWith('catchup:') || this.timeshiftOffsetSec > this.liveEdgeThreshold();
+        const isCatchup = String(channel?.epgParams || '').startsWith('catchup:') || this.timeshiftOffsetSec > 0;
         const playbackUrl = this.getActiveSrc(channel, this.timeshiftOffsetSec);
+        if (isCatchup) {
+            this.activePlaybackUrl = playbackUrl || null;
+        } else {
+            this.activePlaybackUrl = null;
+        }
         const pref = this.playerSettings.player;
         if (pref === VideoPlayer.Mpegts) {
             this.chosenPlayer = 'mpegts';
             return;
         }
-        if (pref === VideoPlayer.Auto) {
-            if (isCatchup) {
-                this.chosenPlayer = VideoPlayer.Html5Player;
-                return;
+
+        // Handle MPV selection explicitly
+        if (pref === 'mpv') {
+            this.chosenPlayer = 'mpv';
+            if (this.activePlaybackUrl) {
+                // Clean up the URL by removing the dollar sign and anything after it
+                const cleanUrl = stripAfterDollar(this.activePlaybackUrl);
+                this.dataService.sendIpcEvent(OPEN_MPV_PLAYER, { url: cleanUrl });
             }
-            this.chosenPlayer = isMpegtsLikeUrl(rawUrl)
-                ? 'mpegts'
-                : VideoPlayer.Html5Player;
             return;
         }
-        this.chosenPlayer = pref as VideoPlayer;
+
+        if (pref === VideoPlayer.Auto) {
+            if (isCatchup) {
+                const eff = playbackUrl || rawUrl;
+                const sanitized = stripAfterDollar(eff || '');
+                const ext = getExtensionFromUrl(sanitized)?.toLowerCase();
+                const isTsLike = isMpegtsLikeUrl(eff || '');
+                const isHlsLike = ext === 'm3u' || ext === 'm3u8';
+            this.chosenPlayer = isTsLike || !isHlsLike ? 'mpegts' : VideoPlayer.Html5Player;
+            return;
+        }
+        
+        // Handle normal auto-selection
+        this.chosenPlayer = isMpegtsLikeUrl(rawUrl)
+            ? 'mpegts'
+            : VideoPlayer.Html5Player;
+        return;
+    }
+
+    // Handle explicit MPV selection if pref was casted from string
+    if ((pref as any) === 'mpv') {
+        this.chosenPlayer = 'mpv';
+        if (playbackUrl || rawUrl) {
+            // Clean up the URL by removing the dollar sign and anything after it
+            let cleanUrl = stripAfterDollar(playbackUrl || rawUrl);
+            // Additional cleanup: remove trailing question mark if it was left by stripping query params improperly
+            if (cleanUrl.endsWith('?')) {
+                 cleanUrl = cleanUrl.slice(0, -1);
+            }
+            this.dataService.sendIpcEvent(OPEN_MPV_PLAYER, { url: cleanUrl });
+        }
+        return;
+    }
+
+    this.chosenPlayer = pref as VideoPlayer;
     }
 
     getActiveSrc(channel: Channel, offsetSec?: number): string {
+        const hasUrlTpl =
+            typeof channel?.url === 'string' &&
+            (channel.url.includes('${(b)') ||
+                channel.url.includes('${(e)') ||
+                channel.url.includes('{utc:') ||
+                channel.url.includes('{utcend:') ||
+                channel.url.includes('{start}') ||
+                channel.url.includes('{end}'));
         if (offsetSec && offsetSec > 0) {
             const snap = this.timeshiftSnapSec();
             const snapped = Math.max(0, Math.floor(offsetSec / snap) * snap);
@@ -410,7 +459,21 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
             const endUtc = fmt(end);
             const tpl =
                 channel?.catchup?.source ||
-                (this.playerSettings?.catchupTemplate || '').trim();
+                (this.playerSettings?.catchupTemplate || '').trim() ||
+                (hasUrlTpl ? channel.url : '');
+            if (tpl) {
+                return buildCatchupUrl(tpl, startUtc, endUtc);
+            }
+        }
+        const params = String(channel?.epgParams || '');
+        if (params.startsWith('catchup:')) {
+            const parts = params.split(':');
+            const startUtc = parts[1];
+            const endUtc = parts[2];
+            const tpl =
+                channel?.catchup?.source ||
+                (this.playerSettings?.catchupTemplate || '').trim() ||
+                (hasUrlTpl ? channel.url : '');
             if (tpl) {
                 return buildCatchupUrl(tpl, startUtc, endUtc);
             }
@@ -432,7 +495,18 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
                 `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}${pad(
                     d.getUTCHours()
                 )}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}`;
-            const tpl = ch?.catchup?.source || (this.playerSettings?.catchupTemplate || '').trim();
+            const hasUrlTpl =
+                typeof ch?.url === 'string' &&
+                (ch.url.includes('${(b)') ||
+                    ch.url.includes('${(e)') ||
+                    ch.url.includes('{utc:') ||
+                    ch.url.includes('{utcend:') ||
+                    ch.url.includes('{start}') ||
+                    ch.url.includes('{end}'));
+            const tpl =
+                ch?.catchup?.source ||
+                (this.playerSettings?.catchupTemplate || '').trim() ||
+                (hasUrlTpl ? ch.url : '');
             if (tpl) url = buildCatchupUrl(tpl, fmt(start), fmt(end));
         });
         sub.unsubscribe();
@@ -548,13 +622,22 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
     }
 
     private resetTimeshiftState(channel: Channel) {
+        const hasUrlTpl =
+            typeof channel?.url === 'string' &&
+            (channel.url.includes('${(b)') ||
+                channel.url.includes('${(e)') ||
+                channel.url.includes('{utc:') ||
+                channel.url.includes('{utcend:') ||
+                channel.url.includes('{start}') ||
+                channel.url.includes('{end}'));
         const hasTpl =
             Boolean(channel?.catchup?.source) ||
-            Boolean(this.playerSettings?.catchupTemplate);
+            Boolean(this.playerSettings?.catchupTemplate) ||
+            hasUrlTpl;
         const days = Number(channel?.catchup?.days || '0');
         const userHours =
             typeof this.playerSettings?.timeshiftWindowHours === 'number'
-                ? Math.max(1, Math.min(72, Math.floor(this.playerSettings.timeshiftWindowHours)))
+                ? Math.max(1, Math.min(168, Math.floor(this.playerSettings.timeshiftWindowHours)))
                 : 3;
         const providerHours = days > 0 ? days * 24 : Number.POSITIVE_INFINITY;
         const maxHours = Math.max(1, Math.floor(Math.min(providerHours, userHours)));

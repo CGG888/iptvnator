@@ -38,9 +38,9 @@ function createWindow(): BrowserWindow {
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             nodeIntegration: true,
-            allowRunningInsecureContent: serve ? true : false,
+            allowRunningInsecureContent: true, // 允许运行不安全内容，解决混合内容问题
             contextIsolation: false,
-            webSecurity: false,
+            webSecurity: false, // 禁用 webSecurity，解决 CORS 和部分证书问题
         },
         backgroundColor: '#111111',
         resizable: true,
@@ -213,6 +213,13 @@ try {
         
         // create hidden window for epg worker
         createEpgWorkerWindow();
+    });
+
+    // 忽略证书错误
+    app.commandLine.appendSwitch('ignore-certificate-errors');
+    app.on('certificate-error', (event, webContents, url, error, certificate, callback) => {
+        event.preventDefault();
+        callback(true);
     });
 
     // Quit when all windows are closed.

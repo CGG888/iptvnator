@@ -27,6 +27,7 @@ import { Store } from '@ngrx/store';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import * as _ from 'lodash';
 import { map, skipWhile } from 'rxjs';
+import moment from 'moment';
 import { Channel } from '../../../../../shared/channel.interface';
 import { FilterPipe } from '../../../shared/pipes/filter.pipe';
 import * as PlaylistActions from '../../../state/actions';
@@ -34,8 +35,11 @@ import {
     selectActive,
     selectActivePlaylistId,
     selectFavorites,
+    selectCurrentEpgProgram,
 } from '../../../state/selectors';
 import { ChannelListItemComponent } from './channel-list-item/channel-list-item.component';
+import { DataService } from '../../../services/data.service';
+import { EPG_GET_PROGRAM, EPG_GET_PROGRAM_DONE } from '../../../../../shared/ipc-commands';
 
 @Component({
     standalone: true,
@@ -86,6 +90,7 @@ export class ChannelListContainerComponent implements OnInit, AfterViewInit {
         });
         this._channelList = Object.values(unique);
         this.groupedChannels = _.default.groupBy(this._channelList, 'group.title');
+        setTimeout(() => this.fetchVisibleEpg(), 100);
     }
 
     /** Object with channels sorted by groups */
@@ -102,8 +107,21 @@ export class ChannelListContainerComponent implements OnInit, AfterViewInit {
     /** Search field element */
     @ViewChild('search') searchElement: ElementRef;
     /** Virtual scroll viewport to control scroll position */
+    private _viewport?: CdkVirtualScrollViewport;
     @ViewChild(CdkVirtualScrollViewport, { static: false })
-    private viewport?: CdkVirtualScrollViewport;
+    set viewport(v: CdkVirtualScrollViewport) {
+        this._viewport = v;
+        if (this._viewport) {
+            setTimeout(() => {
+                this.scrollActiveIntoCenter();
+                this.fetchVisibleEpg();
+            }, 0);
+            this._viewport.elementScrolled().subscribe(() => this.fetchVisibleEpg());
+        }
+    }
+    get viewport() {
+        return this._viewport;
+    }
 
     /** Register ctrl+f as keyboard hotkey to focus the search input field */
     @HostListener('document:keypress', ['$event'])
@@ -136,10 +154,19 @@ export class ChannelListContainerComponent implements OnInit, AfterViewInit {
         )
     );
 
+    /** Favorites id set for quick lookup */
+    favoritesIds$ = this.store.select(selectFavorites);
+
+    /** Current program title for the active channel */
+    currentProgramTitle$ = this.store
+        .select(selectCurrentEpgProgram)
+        .pipe(map((p) => p?.title || ''));
+
     constructor(
         private readonly store: Store,
         private snackBar: MatSnackBar,
-        private translateService: TranslateService
+        private translateService: TranslateService,
+        private electronService: DataService
     ) {}
 
     ngOnInit(): void {
@@ -149,10 +176,74 @@ export class ChannelListContainerComponent implements OnInit, AfterViewInit {
             this.selected = active;
             this.scrollActiveIntoCenter();
         });
+
+        // Listen EPG responses for current program titles per channel
+        this.electronService.listenOn(EPG_GET_PROGRAM_DONE, (_event, response) => {
+            try {
+                const origin = response?.payload?.origin;
+                const items = response?.payload?.items || [];
+                if (!origin?.id) return;
+                const DATE_TIME_FORMAT = 'YYYYMMDDHHmm ZZ';
+                const now = moment();
+                let current = items.find((it) => {
+                    const start = moment(it.start, [DATE_TIME_FORMAT, 'YYYYMMDDHHmm']);
+                    const stop = moment(it.stop, [DATE_TIME_FORMAT, 'YYYYMMDDHHmm']);
+                    return now.isBetween(start, stop, undefined, '[]');
+                });
+                let next = items.find((it) => {
+                    const start = moment(it.start, [DATE_TIME_FORMAT, 'YYYYMMDDHHmm']);
+                    return start.isAfter(now);
+                });
+
+                // Placeholder logic if no current program found
+                if (!current) {
+                    current = {
+                        title: '精彩节目',
+                        start: now.clone().startOf('hour').format('YYYYMMDDHHmm'),
+                        stop: now.clone().add(1, 'hour').startOf('hour').format('YYYYMMDDHHmm'),
+                    } as any;
+                }
+
+                // Placeholder logic if no next program found
+                if (!next) {
+                     next = {
+                        title: '精彩节目',
+                        start: now.clone().add(1, 'hour').startOf('hour').format('YYYYMMDDHHmm'),
+                        stop: now.clone().add(2, 'hour').startOf('hour').format('YYYYMMDDHHmm'),
+                    } as any;
+                }
+
+                const t = current?.title;
+                const titleStr =
+                    Array.isArray(t)
+                        ? (t.find((e: any) => e?.value)?.value || t[0]?.value || '')
+                        : (t ? String(t) : '');
+                this.epgTitleMap[origin.id] = titleStr;
+
+                const fmt = (s?: string, e?: string) =>
+                    s && e
+                        ? `${moment(s, [DATE_TIME_FORMAT, 'YYYYMMDDHHmm']).format('HH:mm')}-${moment(e, [DATE_TIME_FORMAT, 'YYYYMMDDHHmm']).format('HH:mm')}`
+                        : '';
+                const currentFmt = current ? fmt(current.start, current.stop) : '';
+                const currentLine = currentFmt ? `${currentFmt} ${titleStr}` : '';
+                let nextLine = '';
+                if (next) {
+                    const nt = Array.isArray(next.title)
+                        ? (next.title.find((e: any) => e?.value)?.value || next.title[0]?.value || '')
+                        : (next.title ? String(next.title) : '');
+                    const nextFmt = fmt(next.start, next.stop);
+                    if (nextFmt) {
+                        nextLine = `${nextFmt} ${nt}`;
+                    }
+                }
+                this.epgTipMap[origin.id] =
+                    [currentLine, nextLine].filter(Boolean).join('\n');
+            } catch {}
+        });
     }
 
     ngAfterViewInit(): void {
-        this.scrollActiveIntoCenter();
+        // Viewport logic moved to setter
     }
 
     private scrollActiveIntoCenter() {
@@ -166,6 +257,61 @@ export class ChannelListContainerComponent implements OnInit, AfterViewInit {
                 Math.max(0, idx * itemSize - Math.max(0, (viewportSize - itemSize) / 2));
             this.viewport.scrollToOffset(target, 'smooth');
         } catch {}
+    }
+
+    /** Cache of current program titles by channel id */
+    private epgTitleMap: Record<string, string> = {};
+
+    /** Request EPG program titles for the visible range */
+    private fetchVisibleEpg() {
+        try {
+            if (!this.viewport || !this._channelList) return;
+            const range = this.viewport.getRenderedRange();
+            const start = Math.max(0, range.start);
+            const end = Math.min(this._channelList.length, range.end);
+            for (let i = start; i < end; i++) {
+                const ch = this._channelList[i];
+                if (!ch?.id || this.epgTitleMap[ch.id] !== undefined) continue;
+                this.electronService.sendIpcEvent(EPG_GET_PROGRAM, { channel: ch });
+                // mark as requested to avoid duplicate
+                this.epgTitleMap[ch.id] = '';
+            }
+        } catch {}
+    }
+
+    /** Request EPG for specific channels (e.g. in a group) */
+    onGroupOpened(channels: Channel[]) {
+        if (!channels) return;
+        channels.forEach(ch => {
+            if (!ch?.id || this.epgTitleMap[ch.id] !== undefined) return;
+            this.electronService.sendIpcEvent(EPG_GET_PROGRAM, { channel: ch });
+            this.epgTitleMap[ch.id] = '';
+        });
+    }
+
+    /** Helper to get title for channel id */
+    getProgramTitle(channelId?: string): string {
+        return (channelId && this.epgTitleMap[channelId]) || '';
+    }
+
+    /** Whether channel supports replay/timeshift */
+    isReplayCapable(ch: Channel): boolean {
+        if (!ch) return false;
+        const hasCatchup =
+            !!ch.catchup?.source ||
+            !!ch.catchup?.days ||
+            !!ch.catchup?.type;
+        const hasTimeshift =
+            !!ch.timeshift ||
+            !!(ch.tvg && ch.tvg.rec) ||
+            !!ch.epgParams;
+        return hasCatchup || hasTimeshift;
+    }
+
+    /** Tooltip text for a channel with current and next programs */
+    private epgTipMap: Record<string, string> = {};
+    getProgramTooltip(channelId?: string): string {
+        return (channelId && this.epgTipMap[channelId]) || '';
     }
 
     /**

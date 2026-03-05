@@ -3,6 +3,7 @@
   "HOME": {
     "TITLE": "IPTVnator",
     "SUBTITLE": "选择一个播放列表或者从URL/文件中添加一个新的播放列表",
+    "FILTER_BY_NAME": "按名称搜索",
     "TABS": {
       "RECENTLY_ADDED": "最近添加的播放列表",
       "FILE_UPLOAD": "从文件添加",
@@ -10,7 +11,12 @@
       "TEXT_IMPORT": "从文本添加",
       "STALKER_PORTAL_IMPORT": "添加跟踪者门户"
     },
+    "FILTER_BY_TYPE": "按类型筛选",
+    "FILTER_TYPE_M3U": "M3U（本地/URL/文本）",
+    "FILTER_TYPE_XTREAM": "Xtream",
+    "FILTER_TYPE_STALKER": "Stalker",
     "PLAYLISTS": {
+      "SEARCH_PLAYLISTS": "按标题搜索播放列表",
       "NO_PLAYLISTS": "未添加播放列表",
       "ADD_FIRST": "从其他标签页添加你的第一个播放列表",
       "ADDED_VIA_URL": "添加自URL链接:",
@@ -20,6 +26,7 @@
       "SHOW_DETAILS": "显示播放列表详情",
       "REMOVE": "移除播放列表",
       "INFO_DIALOG": {
+        "EXPORT_PLAYLIST": "导出播放列表为 m3u",
         "PLAYLIST_DETAILS": "播放列表详情",
         "TITLE": "标题",
         "FROM_URL": "添加自URL链接",
@@ -47,7 +54,8 @@
       "REFRESH": "刷新播放列表",
       "GLOBAL_FAVORITES": "我的收藏",
       "GLOBAL_FAVORITES_DESCRIPTION": "由所有播放列表自动生成的聚合收藏列表",
-      "MY_PLAYLISTS": "我的播放列表"
+      "MY_PLAYLISTS": "我的播放列表",
+      "MY_PLAYLISTS_SUBTITLE": "所有可用播放列表"
     },
     "FILE_UPLOAD": {
       "DRAG_DROP": "将文件拖放到此处",
@@ -75,11 +83,21 @@
     "TITLE": "设置",
     "SUBTITLE": "更改应用程序的配置 ",
     "DESCRIPTION": "请调整以下列表中的选项并使用保存按钮确认",
+    "PLAYER_AUTO": "AUTO",
+    "PLAYER_HTML5": "HTML5 player",
+    "PLAYER_VIDEOJS": "Video.js",
+    "PLAYER_MPEGTS": "mpegts.js",
+    "PLAYER_MPV": "mpv player",
+    "PLAYER_VLC": "VLC player",
     "EPG_URL_LABEL": "电子节目单EPG Url (*.xml 或 *.xml.gz)",
     "EPG_URL_PLACEHOLDER": "输入一个 URL",
     "REFRESH_EPG": "刷新电子节目单EPG",
     "VIDEO_PLAYER_LABEL": "视频播放器",
     "VIDEO_PLAYER_PLACEHOLDER": "选择一个选项",
+    "EPG_URL_ADD_DESC": "可添加一个或多个 URL 作为 EPG 源",
+    "CATCHUP_TEMPLATE_LABEL": "回看模板",
+    "CATCHUP_TEMPLATE_DESC": "未在频道声明回看模板时，使用此模板生成回看地址",
+    "TIMESHIFT_WINDOW_LABEL": "时移窗口（小时）",
     "VERSION": "版本",
     "SAVE_CHANGES": "保存更改",
     "BACK_TO_HOME": "回到主页",
@@ -91,6 +109,7 @@
     "SHOW_CAPTIONS": "显示字幕",
     "REMOVE_ALL": "删除播放列表",
     "REMOVE_ALL_BUTTON": "删除",
+    "REMOVE_ALL_DESCRIPTION": "这将从应用程序中移除所有现有的播放列表。",
     "REMOVE_DIALOG": {
       "TITLE": "删除所有播放列表",
       "MESSAGE": "您确定要从应用程序中删除所有播放列表吗？"
@@ -110,16 +129,29 @@
     "PLAYER_TUNING_BALANCED": "平衡",
     "PLAYER_TUNING_ROBUST": "稳健",
     "SHOW_STREAM_INFO": "显示码流信息叠层",
+    "SHOW_CAPTIONS_DESCRIPTION": "默认显示或隐藏字幕",
     "VIDEO_PLAYER_DESCRIPTION": "选择默认视频播放器。Auto：m3u8→Video.js；ts/flv/mpegts→mpegts.js；mp4→HTML5。",
     "IMPORT_EXPORT_DATA": "导入/导出播放列表",
     "VLC_PLAYER_PATH_LABEL": "VLC路径",
     "VLC_PLAYER_PATH_DESCRIPTION": "设置系统中 VLC 播放器的路径。\n它将使用提供的 VLC 二进制文件路径，而不是我们系统的默认路径。",
+    "MPV_PLAYER_PATH_DESCRIPTION": "设置系统中的 mpv player 路径。将使用提供的 mpv 可执行文件路径，而不是使用 $PATH 中找到的路径。",
     "THEME_DESCRIPTION": "选择应用程序的视觉主题",
     "EPG_NOTE": "目前 EPG 仅在基于电子的 IPTVnator 版本中可用。",
     "VLC_PLAYER_PATH": "VLC播放器路径",
     "IMPORT_EXPORT_DATA_DESCRIPTION": "以应用程序中使用的 JSON 格式导出或导入播放列表。",
     "EPG_NOTE_URL_TEXT": "在这里检查一下",
-    "MPV_PLAYER_PATH_LABEL": "多用途车路径"
+    "MPV_PLAYER_PATH_LABEL": "mpv player 路径",
+    "MPV_PLAYER_PATH": "mpv player 路径",
+    "REMOTE_CONTROL": "远程控制",
+    "REMOTE_CONTROL_DESCRIPTION": "启用对应用程序的远程控制",
+    "REMOTE_CONTROL_PORT": "远程控制端口",
+    "REMOTE_CONTROL_PORT_DESCRIPTION": "用于远程控制的端口。默认使用 3000。"
+  },
+  "REMOTE_CONTROL": {
+    "TITLE": "远程控制",
+    "DESCRIPTION": "启用对应用程序的远程控制",
+    "PORT": "远程控制端口",
+    "PORT_DESCRIPTION": "用于远程控制的端口。默认使用 3000。"
   },
   "THEMES": {
     "DARK_THEME": "暗黑模式",
@@ -193,6 +225,10 @@
     "ABOUT": "关于",
     "ABOUT_ARIA": "关于应用",
     "SUPPORT_PROJECT": "支持项目"
+  },
+  "COMMON": {
+    "BACK": "返回",
+    "REPLAY_TOOLTIP": "可时移回看"
   },
   "XTREAM": {
     "RELEASE_DATE": "发布日期",

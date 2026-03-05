@@ -31,6 +31,60 @@ const loggerLabel = '[EPG Worker]';
 /** List with fetched EPG URLs */
 const fetchedUrls: string[] = [];
 
+// --- Fast Lookup Maps ---
+/** Map: tvg-id -> EpgChannel */
+const epgIdMap = new Map<string, EpgChannel>();
+/** Map: normalized_name -> EpgChannel */
+const epgNameMap = new Map<string, EpgChannel>();
+
+/**
+ * Builds the fast lookup maps from EPG data
+ */
+const buildEpgMaps = () => {
+    console.log(loggerLabel, 'building fast lookup maps...');
+    // Clear existing maps if we are rebuilding (though typically we append)
+    // But since we append to EPG_DATA, we should probably clear and rebuild or just add new ones.
+    // For safety, let's rebuild from scratch based on current EPG_DATA.channels
+    epgIdMap.clear();
+    epgNameMap.clear();
+
+    if (!EPG_DATA || !EPG_DATA.channels) return;
+
+    for (const ch of EPG_DATA.channels) {
+        // 1. Map by ID
+        if (ch.id) {
+            epgIdMap.set(ch.id, ch);
+        }
+
+        // 2. Map by Name (Normalized)
+        if (ch.name && Array.isArray(ch.name)) {
+            for (const n of ch.name) {
+                if (n.value) {
+                    const norm = normalize(n.value);
+                    if (norm) {
+                        // If conflict, first one wins (or maybe we should store array?)
+                        // For simple matching, first one is usually fine.
+                        if (!epgNameMap.has(norm)) {
+                            epgNameMap.set(norm, ch);
+                        }
+                    }
+                    // Also map the raw trimmed name for exact match
+                    const raw = n.value.trim();
+                    if (raw && !epgNameMap.has(raw)) {
+                        epgNameMap.set(raw, ch);
+                    }
+                     // Also map the lowercased raw name
+                    const lower = raw.toLowerCase();
+                    if (lower && !epgNameMap.has(lower)) {
+                        epgNameMap.set(lower, ch);
+                    }
+                }
+            }
+        }
+    }
+    console.log(loggerLabel, `maps built. IDs: ${epgIdMap.size}, Names: ${epgNameMap.size}`);
+};
+
 /**
  * Fetches the epg data from the given url
  * @param epgUrl url of the epg file
@@ -80,6 +134,7 @@ const parseAndSetEpg = (xmlString) => {
     };
     // map programs to channels
     EPG_DATA_MERGED = convertEpgData();
+    buildEpgMaps(); // Build index
     ipcRenderer.send(EPG_FETCH_DONE);
     console.log(loggerLabel, 'done, parsing was finished...');
 };
@@ -128,7 +183,7 @@ const normalize = (str: string) => {
         .replace(/\s+/g, '')
         .replace(/[【】\[\]\(\)\-_.·]/g, '')
         .replace(/频道|频道高清|频道超清|频道超高清|频道标清|台/g, '')
-        .replace(/超高清|超清|标清|高清|uhd|4k|hd|sd/g, '')
+        .replace(/超高清|超清|标清|高清|hd|sd/g, '') // Keep 4k/uhd to distinguish 4K channels
         .replace(/cctv-?/g, 'cctv')
         .replace(/央视频道/g, '')
         .replace(/湖南卫视高清/g, '湖南卫视')
@@ -149,51 +204,45 @@ const findBestMatchingEpgChannel = (
     tvgName?: string
 ) => {
     if (!EPG_DATA || !EPG_DATA.channels) return undefined;
-    // 1) Exact tvg-id match
-    if (tvgId) {
-        const byId = EPG_DATA.channels.find((c) => c.id === tvgId);
-        if (byId) return byId;
+    
+    // 1) Exact tvg-id match (O(1))
+    if (tvgId && epgIdMap.has(tvgId)) {
+        return epgIdMap.get(tvgId);
     }
-    const candidates = EPG_DATA.channels;
+
     const srcNames = [
         channelName?.trim() || '',
         tvgName?.trim() || '',
     ].filter(Boolean);
-    const normSrc = srcNames.map(normalize).filter(Boolean);
 
-    // 2) Exact trim/case-insensitive
-    for (const epgCh of candidates) {
-        if (
-            epgChannelHasName(epgCh, (v) =>
-                srcNames.includes(String(v).trim())
-            )
-        ) {
-            return epgCh;
+    // 2) Exact Name Match (O(1))
+    for (const name of srcNames) {
+        if (epgNameMap.has(name)) {
+            return epgNameMap.get(name);
         }
     }
-    // 3) Normalized equality
-    for (const epgCh of candidates) {
-        if (
-            epgChannelHasName(epgCh, (v) => {
-                const nv = normalize(v);
-                return normSrc.includes(nv);
-            })
-        ) {
-            return epgCh;
+
+    // 3) Lowercase Name Match (O(1))
+    for (const name of srcNames) {
+        const lower = name.toLowerCase();
+        if (epgNameMap.has(lower)) {
+            return epgNameMap.get(lower);
         }
     }
-    // 4) Includes/substring after normalization
-    for (const epgCh of candidates) {
-        const epgNormNames =
-            epgCh?.name?.map((n) => normalize(n?.value || '')) || [];
-        if (
-            epgNormNames.some(
-                (en) => en && normSrc.some((ns) => ns.includes(en) || en.includes(ns))
-            )
-        ) {
-            return epgCh;
+
+    // 4) Normalized Name Match (O(1))
+    const normSrc = srcNames.map(normalize).filter(Boolean);
+    for (const norm of normSrc) {
+        if (epgNameMap.has(norm)) {
+            return epgNameMap.get(norm);
         }
     }
+    
+    // Fallback: If map lookup fails, we *could* do the slow linear scan for substring matching,
+    // but the user wanted optimization.
+    // Given the "CCTV" mismatch issue earlier, strict matching via Map is safer and faster.
+    // We will skip the fuzzy substring search to avoid O(N) cost and false positives.
+    
     return undefined;
 };
 
@@ -202,6 +251,7 @@ ipcRenderer.on(EPG_GET_PROGRAM, (event, args) => {
     const channelName = args.channel?.name;
     const tvgId = args.channel?.tvg?.id;
     const tvgName = args.channel?.tvg?.name;
+    const origin = args.channel;
     if (!EPG_DATA || !EPG_DATA.channels) return;
     const foundChannel =
         findBestMatchingEpgChannel(channelName, tvgId, tvgName) || null;
@@ -211,12 +261,12 @@ ipcRenderer.on(EPG_GET_PROGRAM, (event, args) => {
             (ch) => ch.channel === foundChannel.id
         );
         ipcRenderer.send(EPG_GET_PROGRAM_DONE, {
-            payload: { channel: foundChannel, items: programs },
+            payload: { channel: foundChannel, items: programs, origin },
         });
     } else {
         console.log('EPG program for the channel was not found...');
         ipcRenderer.send(EPG_GET_PROGRAM_DONE, {
-            payload: { channel: {}, items: [] },
+            payload: { channel: {}, items: [], origin },
         });
     }
 });

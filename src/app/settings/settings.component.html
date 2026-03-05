@@ -13,7 +13,7 @@
             <div class="row">
                 <div class="column">
                     {{ 'SETTINGS.EPG_URL_LABEL' | translate }}
-                    <p>Add single or multiple URLs as EPG sources</p>
+                    <p>{{ 'SETTINGS.EPG_URL_ADD_DESC' | translate }}</p>
                 </div>
                 <div class="column">
                     <div
@@ -86,7 +86,7 @@
                             *ngFor="let player of players"
                             [value]="player.id"
                             [attr.data-test-id]="player.id"
-                            >{{ player.label }}
+                            >{{ player.labelKey | translate }}
                         </mat-option>
                     </mat-select>
                 </mat-form-field>
@@ -202,8 +202,8 @@
         <mat-divider></mat-divider>
         <div class="row">
             <div class="column">
-                回看模板
-                <p>未在频道声明回看模板时，使用此模板生成回看地址</p>
+                {{ 'SETTINGS.CATCHUP_TEMPLATE_LABEL' | translate }}
+                <p>{{ 'SETTINGS.CATCHUP_TEMPLATE_DESC' | translate }}</p>
             </div>
             <div class="column">
                 <mat-form-field appearance="outline" class="full-width">
@@ -212,8 +212,8 @@
                 </mat-form-field>
                 <div style="display:flex; gap:12px; align-items:center;">
                     <mat-form-field appearance="outline" style="width: 220px;">
-                        <mat-label>时移窗口（小时）</mat-label>
-                        <input matInput type="number" min="1" max="72" formControlName="timeshiftWindowHours" />
+                        <mat-label>{{ 'SETTINGS.TIMESHIFT_WINDOW_LABEL' | translate }}</mat-label>
+                        <input matInput type="number" min="1" max="168" formControlName="timeshiftWindowHours" />
                     </mat-form-field>
                 </div>
             </div>

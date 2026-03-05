@@ -60,6 +60,7 @@
                 <app-mpegts-player
                     *ngIf="chosenPlayer === 'mpegts'"
                     [channel]="activeChannel"
+                    [playbackUrl]="activePlaybackUrl"
                     [tuning]="playerSettings.playbackProfile || 'balanced'"
                     (mediaInfo)="onMediaInfo($event)"
                 />

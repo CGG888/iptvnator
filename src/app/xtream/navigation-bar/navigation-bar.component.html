@@ -82,7 +82,7 @@
                 <mat-icon matPrefix>search</mat-icon>
                 <input
                     matInput
-                    placeholder="Search by name"
+                    [placeholder]="'HOME.FILTER_BY_NAME' | translate"
                     type="search"
                     [ngModel]="searchPhrase()"
                     (ngModelChange)="searchPhraseUpdate.next($event)"

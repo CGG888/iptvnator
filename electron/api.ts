@@ -43,11 +43,14 @@ import {
     APP_UPDATE_ERROR,
     APP_UPDATE_INSTALL,
     APP_UPDATE_TEST,
+    CACHE_LOGO,
+    CACHE_LOGO_RESPONSE,
 } from '../shared/ipc-commands';
 import { Playlist } from '../shared/playlist.interface';
 import { createPlaylistObject } from '../shared/playlist.utils';
 import { ParsedPlaylist } from '../src/typings.d';
 import { Server } from './server';
+import * as crypto from 'crypto';
 
 const fs = require('fs');
 const https = require('https');
@@ -79,6 +82,12 @@ const db = new Nedb({
     filename: dbPath,
     autoload: true,
 });
+
+/** Directory for caching logos */
+const LOGO_CACHE_DIR = path.join(userData, 'logo-cache');
+if (!fs.existsSync(LOGO_CACHE_DIR)) {
+    fs.mkdirSync(LOGO_CACHE_DIR, { recursive: true });
+}
 
 const agent = new https.Agent({
     rejectUnauthorized: false,
@@ -287,11 +296,24 @@ export class Api {
             })
             .on(SET_MPV_PLAYER_PATH, (_event, mpvPlayerPath) => {
                 console.log('... setting mpv player path', mpvPlayerPath);
+                const oldPath = store.get(MPV_PLAYER_PATH);
                 store.set(MPV_PLAYER_PATH, mpvPlayerPath);
 
                 // recreate mpv player instance with new binary path if it was changed
-                if (store.get(MPV_PLAYER_PATH, mpvPlayerPath) !== mpvPlayerPath)
+                if (oldPath !== mpvPlayerPath) {
+                    if (this.mpv) {
+                        try {
+                            // Try to quit if possible
+                            // Note: node-mpv might not expose .quit() directly or it might be async
+                            // We just null it out so createMpvInstance makes a new one
+                        } catch (e) {
+                            console.error('Error handling old mpv instance:', e);
+                        }
+                        this.mpv = null;
+                    }
+                    // Re-instantiate immediately to check if path is valid
                     this.mpv = this.createMpvInstance();
+                }
             })
             .on(OPEN_VLC_PLAYER, (event, { url }) => {
                 const proc = child_process.spawn(
@@ -753,6 +775,57 @@ export class Api {
                 }
             });
 
+    // listener for logo cache requests
+    ipcMain.on(CACHE_LOGO, async (event, logoUrl: string) => {
+        if (!logoUrl || !logoUrl.startsWith('http')) {
+            // Invalid or local URL, return as is
+            event.sender.send(CACHE_LOGO_RESPONSE, { url: logoUrl, original: logoUrl });
+            return;
+        }
+
+        try {
+            // Create a hash of the URL to use as filename
+            const hash = crypto.createHash('md5').update(logoUrl).digest('hex');
+            // Try to guess extension or default to .png
+            let ext = path.extname(logoUrl).split('?')[0] || '.png';
+            if (!['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp'].includes(ext.toLowerCase())) {
+                ext = '.png';
+            }
+            const filename = `${hash}${ext}`;
+            const localPath = path.join(LOGO_CACHE_DIR, filename);
+            
+            // Check if file exists
+            try {
+                await fsPromises.access(localPath);
+                // File exists, return local path (as file:// URL)
+                event.sender.send(CACHE_LOGO_RESPONSE, { 
+                    url: `file://${localPath}`, 
+                    original: logoUrl 
+                });
+                return;
+            } catch {
+                // File doesn't exist, proceed to download
+            }
+
+            const response = await axios.get(logoUrl, { 
+                responseType: 'arraybuffer',
+                timeout: 10000 
+            });
+            
+            await fsPromises.writeFile(localPath, response.data);
+            
+            event.sender.send(CACHE_LOGO_RESPONSE, { 
+                url: `file://${localPath}`, 
+                original: logoUrl 
+            });
+
+        } catch (error) {
+            // On error, return original URL so the image can still try to load normally
+            // console.error('Failed to cache logo:', logoUrl, error.message);
+            event.sender.send(CACHE_LOGO_RESPONSE, { url: logoUrl, original: logoUrl });
+        }
+    });
+
         // listeners for EPG events
         ipcMain
             .on(EPG_GET_PROGRAM, (_event, arg) =>
@@ -853,11 +926,17 @@ export class Api {
     }
 
     createMpvInstance() {
-        const mpvPlayerPath = this.store.get(MPV_PLAYER_PATH);
+        let mpvPlayerPath = this.store.get(MPV_PLAYER_PATH);
         console.log('... getting mpv player path', mpvPlayerPath);
+        
+        // Sanitize path for Windows if needed (remove quotes if present)
+        if (mpvPlayerPath) {
+            mpvPlayerPath = mpvPlayerPath.replace(/^"|"$/g, '');
+        }
+
         return new mpvAPI(
             { ...(mpvPlayerPath ? { binary: mpvPlayerPath } : {}) },
-            ['--autofit=70%']
+            ['--autofit=70%', '--hwdec=auto']
         );
     }
 

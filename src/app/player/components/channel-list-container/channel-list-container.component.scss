@@ -6,6 +6,8 @@
 
 .scroll-viewport {
     min-height: calc(100vh - 185px);
+    width: 100%;
+    overflow-x: hidden !important; /* Force hide horizontal scroll */
 }
 
 .search-panel {
@@ -20,11 +22,17 @@
 }
 
 mat-nav-list {
-    overflow: scroll;
+    overflow-y: auto;
+    overflow-x: hidden; /* Prevent horizontal scroll */
     max-height: calc(100vh - 193px);
 }
 
 ::ng-deep {
+    .cdk-virtual-scroll-content-wrapper {
+        width: 100% !important; /* Ensure content doesn't overflow */
+        max-width: 100% !important;
+    }
+
     .search-bar {
         div {
             border-radius: 20px;
@@ -79,5 +87,6 @@ mat-nav-list {
 
     .scroll-viewport {
         min-height: calc(50vh - 159px);
+    overflow-x: hidden !important;
     }
 }

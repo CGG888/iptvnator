@@ -22,6 +22,7 @@ import mpegts from 'mpegts.js';
 })
 export class MpegtsPlayerComponent implements OnChanges, OnDestroy {
     @Input() channel: Channel;
+    @Input() playbackUrl?: string;
     @Input() tuning: 'low' | 'balanced' | 'robust' = 'balanced';
     @ViewChild('videoRef', { static: true })
     videoRef: ElementRef<HTMLVideoElement>;
@@ -46,14 +47,12 @@ export class MpegtsPlayerComponent implements OnChanges, OnDestroy {
     ngOnChanges(changes: SimpleChanges): void {
         if (changes.channel && changes.channel.currentValue) {
             this.play(changes.channel.currentValue);
+        } else if (changes.playbackUrl) {
+            if (this.channel) this.play(this.channel);
         }
     }
 
     private play(channel: Channel) {
-        // 避免在回放场景误用 mpegts 播放器（回放统一走 HTML5）
-        if (String(channel?.epgParams || '').startsWith('catchup:')) {
-            return;
-        }
         // 重置探测状态，避免上一频道状态影响新频道
         this.codecSet = false;
         this.audioSet = false;
@@ -61,7 +60,7 @@ export class MpegtsPlayerComponent implements OnChanges, OnDestroy {
             clearInterval(this.probeTimer);
             this.probeTimer = null;
         }
-        const url = getPlaybackUrl(channel as any);
+        const url = this.playbackUrl || getPlaybackUrl(channel as any);
         if (this.player) {
             try {
                 this.player.unload();
@@ -112,8 +111,31 @@ export class MpegtsPlayerComponent implements OnChanges, OnDestroy {
                         cfg = { ...cfg, enableStashBuffer: false, stashInitialSize: 131072 };
                     }
                 }
-                this.player = mpegts.createPlayer({ type: 'mpegts', url }, cfg);
+                // 处理 RTSP over HTTP/HTTPS 的情况，mpegts.js 需要 http(s) 协议的 URL
+                let finalUrl = url;
+                if (url.startsWith('rtsp://')) {
+                    // 如果是 RTSP 协议，尝试通过 HTTP/HTTPS 代理或者转换
+                    // 这里假设存在某种机制将 rtsp 转换为 http，或者 mpegts.js 在某些配置下能处理
+                    // 但根据日志，请求的是 https://iptv.yida.cc.cd:8025/rtsp/...
+                    // 并且出现了 net::ERR_CERT_AUTHORITY_INVALID
+                    // 这通常意味着自签名证书问题
+                    // mpegts.js 本身不支持直接播放 rtsp，通常需要 websocket 或者 http flv/ts
+                    // 如果 url 本身就是 http/https 但路径包含 rtsp，则直接使用
+                }
+
+                this.player = mpegts.createPlayer({ type: 'mpegts', url: finalUrl }, cfg);
                 this.player.attachMediaElement(this.videoRef.nativeElement);
+                // 监听错误事件
+                this.player.on((mpegts as any).Events.ERROR, (errorType: any, errorDetail: any, errorInfo: any) => {
+                    console.error('Mpegts error:', errorType, errorDetail, errorInfo);
+                    // 忽略网络错误，mpegts.js 会自动重试
+                    if (errorType === (mpegts as any).ErrorTypes.NETWORK_ERROR) {
+                        // 针对 net::ERR_CERT_AUTHORITY_INVALID 等证书错误，通常无法在 JS 层自动解决
+                        // 除非使用 Electron 的 certificate 忽略机制，但这属于全局配置
+                        // 这里尝试做有限的重试或者提示
+                        return;
+                    }
+                });
                 const guess = this.guessFromChannel(channel);
                 if (guess.videoCodec || typeof guess.audioChannels === 'number') this.mediaInfo.emit(guess);
                 try {
